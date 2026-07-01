@@ -20,6 +20,7 @@ Suggests:
     cli,
     concaveman,
     DHARMa,
+    ggspatial,
     inlabru,
     knitr,
     memuse,
@@ -28,14 +29,14 @@ Suggests:
     RColorBrewer,
     rmarkdown,
     sdmTMBextra,
-    testthat
+    testthat,
+    tidyr
 Config/testthat/edition: 3
 Imports: 
     cowplot,
     dplyr,
     future,
     future.apply,
-    ggOceanMaps,
     ggplot2,
     magrittr,
     plyr,
@@ -49,5 +50,7 @@ Imports:
 URL: https://github.com/DeepWaterIMR/sdmTMBexperiments, https://deepwaterimr.github.io/sdmTMBexperiments/
 BugReports: https://github.com/DeepWaterIMR/sdmTMBexperiments/issues
 VignetteBuilder: knitr
-Depends: R (>= 4.1.0)
+Depends: 
+    ggOceanMaps,
+    R (>= 4.1.0)
 LazyData: true
