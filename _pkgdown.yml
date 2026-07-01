@@ -1,0 +1,7 @@
+url: https://deepwaterimr.github.io/sdmTMBexperiments/
+
+template:
+  bootstrap: 5
+
+development:
+  mode: auto

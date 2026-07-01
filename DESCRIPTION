@@ -1,0 +1,53 @@
+Package: sdmTMBexperiments
+Title: Experimental Helper Functions for 'sdmTMB'
+Version: 0.1.0
+Authors@R: 
+    person("Mikko", "Vihtakari", , "mikko.vihtakari@hi.no", role = c("aut", "cre"),
+           comment = c(affiliation = "Institute of Marine Research", ORCID = "0000-0003-0371-4319"))
+Description: A collection of experimental helper functions for working
+    with fitted spatiotemporal models from the 'sdmTMB' package: model
+    comparison, mesh sensitivity analysis, retrospective analysis,
+    survey-specific index comparison, prediction-grid construction, and
+    diagnostic plotting. The package doubles as a showcase of how to use
+    these functions and a staging ground for methods that may later be
+    adopted into 'sdmTMB'.
+License: GPL (>= 3)
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 8.0.0
+Suggests: 
+    blockCV,
+    cli,
+    concaveman,
+    DHARMa,
+    inlabru,
+    knitr,
+    memuse,
+    pbapply,
+    ps,
+    RColorBrewer,
+    rmarkdown,
+    sdmTMBextra,
+    testthat
+Config/testthat/edition: 3
+Imports: 
+    cowplot,
+    dplyr,
+    future,
+    future.apply,
+    ggOceanMaps,
+    ggplot2,
+    magrittr,
+    plyr,
+    rlang,
+    scales,
+    sdmTMB,
+    sf,
+    stats,
+    tibble,
+    viridis
+URL: https://github.com/DeepWaterIMR/sdmTMBexperiments, https://deepwaterimr.github.io/sdmTMBexperiments/
+BugReports: https://github.com/DeepWaterIMR/sdmTMBexperiments/issues
+VignetteBuilder: knitr
+Depends: R (>= 4.1.0)
+LazyData: true

@@ -1,0 +1,16 @@
+^sdmTMBexperiments\.Rproj$
+^\.Rproj\.user$
+^LICENSE\.md$
+^\.github$
+^_pkgdown\.yml$
+^pkgdown$
+^docs$
+^data-raw$
+^dev$
+^memory$
+^AGENTS\.md$
+^CLAUDE\.md$
+^\.claude$
+^\.DS_Store$
+^README\.Rmd$
+^\.plan$
