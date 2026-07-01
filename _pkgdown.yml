@@ -5,3 +5,34 @@ template:
 
 development:
   mode: auto
+
+reference:
+- title: Model and mesh comparison
+  contents:
+  - compare_models
+  - compare_meshes
+  - sdmTMB_mesh_cv
+- title: Retrospective analysis
+  contents:
+  - sdmTMB_retro
+  - mohns_rho
+- title: Survey comparison and prediction grids
+  contents:
+  - compare_surveys
+  - make_survey_prediction_region
+  - make_prediction_grid
+- title: Plotting
+  contents:
+  - plot_mesh
+  - plot_prediction_map
+  - plot_random_field
+  - plot_index
+  - plot_fixed_effects
+  - plot_variance_partitioning
+  - plot_prediction_histogram
+  - plot_residual_qq
+  - bubble_map
+  - starts_with("plot.")
+- title: Data
+  contents:
+  - sebastes

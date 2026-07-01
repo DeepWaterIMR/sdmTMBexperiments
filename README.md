@@ -1,0 +1,65 @@
+
+<!-- README.md is generated from README.Rmd. Please edit that file -->
+
+# sdmTMBexperiments
+
+<!-- badges: start -->
+
+[![Lifecycle:
+experimental](https://img.shields.io/badge/lifecycle-experimental-orange.svg)](https://lifecycle.r-lib.org/articles/stages.html#experimental)
+[![R-CMD-check](https://github.com/DeepWaterIMR/sdmTMBexperiments/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/DeepWaterIMR/sdmTMBexperiments/actions/workflows/R-CMD-check.yaml)
+<!-- badges: end -->
+
+**sdmTMBexperiments** is a collection of experimental helper functions
+for working with fitted [sdmTMB](https://github.com/sdmTMB/sdmTMB)
+models: model comparison, mesh-resolution sensitivity, retrospective
+analysis, survey-specific index comparison, prediction-grid
+construction, and diagnostic plotting. It doubles as a showcase of how
+to use these functions and a staging ground for methods that may later
+be adopted into `sdmTMB`.
+
+The functions are generic (no species or region is hard-coded) and may
+be freely reused — please cite the function developer. Maps are drawn on
+[ggOceanMaps](https://mikkovihtakari.github.io/ggOceanMaps/) basemaps,
+the package’s default map-plotting tool.
+
+## Installation
+
+``` r
+# install.packages("remotes")
+remotes::install_github("DeepWaterIMR/sdmTMBexperiments")
+```
+
+## Example
+
+``` r
+library(sdmTMBexperiments)
+library(sdmTMB)
+
+mesh <- make_mesh(pcod, c("X", "Y"), cutoff = 20)
+m1 <- sdmTMB(density ~ 0 + as.factor(year), data = pcod,
+             time = "year", mesh = mesh, family = tweedie())
+m2 <- sdmTMB(density ~ 0 + as.factor(year) + depth_scaled, data = pcod,
+             time = "year", mesh = mesh, family = tweedie())
+nd <- replicate_df(qcs_grid, "year", unique(pcod$year))
+
+# Compare two models: indices, spatial prediction differences, Mohn's rho
+cmp <- compare_models(m1, m2, newdata = nd, object_crs = 32609)
+plot(cmp)
+plot(cmp, type = "spatial")
+
+# Retrospective analysis
+plot(sdmTMB_retro(m1, nd, nyears = 5))
+
+# Diagnostics
+plot_mesh(mesh, crs = 32609, data = pcod, value = "density")
+plot_residual_qq(m1)
+```
+
+See `vignette("sdmTMBexperiments")` for an end-to-end walkthrough,
+including survey comparison with the bundled `sebastes` data.
+
+## Citation
+
+If you use these functions, please cite the package and the function
+developer (Mikko Vihtakari, Institute of Marine Research).
