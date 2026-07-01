@@ -68,7 +68,7 @@ resulting survey indices and predictions to the original (reference) model.
 Useful for assessing the sensitivity of an index to mesh resolution.
 }
 \examples{
-\donttest{
+\dontrun{
 mesh <- sdmTMB::make_mesh(sdmTMB::pcod, c("X", "Y"), cutoff = 20)
 m <- sdmTMB::sdmTMB(
   data = sdmTMB::pcod, formula = density ~ 0 + as.factor(year),

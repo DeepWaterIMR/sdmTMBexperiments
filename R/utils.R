@@ -29,15 +29,22 @@
   old_plan
 }
 
-#' Set future.globals.maxSize based on free system memory
+#' Set future.globals.maxSize for transferring fitted models to workers
 #'
-#' Uses \pkg{ps} when available to size the globals limit to the free RAM,
-#' otherwise removes the limit. Fixes the earlier behaviour where the fallback
-#' branch computed a value without assigning it to `options()`.
+#' Fitted sdmTMB models are intentionally sent to parallel workers, so the
+#' default `future.globals.maxSize` (which guards against accidental large
+#' transfers) is raised. A generous floor (2 GiB) is always applied so the option
+#' never drops below what legitimate model transfers need — this fixes both the
+#' earlier "computed but never assigned" bug and a memory-constrained environment
+#' setting the limit too low. When free RAM is known and large, the limit is
+#' scaled up to it, capped at ~14 GiB.
 #'
 #' @keywords internal
 #' @noRd
 .set_future_memory <- function() {
+  floor_bytes <- 2 * 1024^3
+  cap_bytes <- 14e3 * 1024^2
+
   free <- tryCatch(
     if (requireNamespace("ps", quietly = TRUE)) {
       as.numeric(ps::ps_system_memory()$free)
@@ -47,13 +54,12 @@
     error = function(e) NA_real_
   )
 
-  if (is.na(free)) {
-    options(future.globals.maxSize = Inf)
-  } else if (free / 1024^3 > 15) {
-    options(future.globals.maxSize = 14e3 * 1024^2)
+  size <- if (is.na(free)) {
+    floor_bytes
   } else {
-    options(future.globals.maxSize = free * 0.8)
+    min(max(free * 0.8, floor_bytes), cap_bytes)
   }
+  options(future.globals.maxSize = size)
   invisible(NULL)
 }
 

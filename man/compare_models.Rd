@@ -62,7 +62,7 @@ sanity checks. The result can be plotted with
 \code{\link[=plot.sdmTMB_model_comparison]{plot.sdmTMB_model_comparison()}}.
 }
 \examples{
-\donttest{
+\dontrun{
 mesh <- sdmTMB::make_mesh(sdmTMB::pcod, c("X", "Y"), cutoff = 20)
 m1 <- sdmTMB::sdmTMB(
   data = sdmTMB::pcod, formula = density ~ 0 + as.factor(year),
@@ -73,7 +73,7 @@ m2 <- sdmTMB::sdmTMB(
   time = "year", mesh = mesh, family = sdmTMB::tweedie(link = "log")
 )
 nd <- sdmTMB::replicate_df(sdmTMB::qcs_grid, "year", unique(sdmTMB::pcod$year))
-x <- compare_models(m1, m2, newdata = nd)
+x <- compare_models(m1, m2, newdata = nd, object_crs = 32609)
 plot(x)
 plot(x, type = "spatial")
 }

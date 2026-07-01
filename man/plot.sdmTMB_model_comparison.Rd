@@ -14,7 +14,8 @@
   transform_color_scale = TRUE,
   limit_rounding = 10,
   break_rounding = 5,
-  base_size = 11
+  base_size = 11,
+  ...
 )
 }
 \arguments{
@@ -39,6 +40,8 @@ for spatial plots? Default \code{TRUE}.}
 breaks. Defaults \code{10} and \code{5}.}
 
 \item{base_size}{Numeric. Base font size. Default \code{11}.}
+
+\item{...}{Currently ignored.}
 }
 \value{
 A \code{ggplot} object (\code{type = "index"}) or a \code{cowplot} grid

@@ -37,7 +37,7 @@
 #'
 #' @importFrom rlang .data
 #' @examples
-#' \donttest{
+#' \dontrun{
 #' mesh <- sdmTMB::make_mesh(sdmTMB::pcod, c("X", "Y"), cutoff = 20)
 #' m1 <- sdmTMB::sdmTMB(
 #'   data = sdmTMB::pcod, formula = density ~ 0 + as.factor(year),
@@ -48,7 +48,7 @@
 #'   time = "year", mesh = mesh, family = sdmTMB::tweedie(link = "log")
 #' )
 #' nd <- sdmTMB::replicate_df(sdmTMB::qcs_grid, "year", unique(sdmTMB::pcod$year))
-#' x <- compare_models(m1, m2, newdata = nd)
+#' x <- compare_models(m1, m2, newdata = nd, object_crs = 32609)
 #' plot(x)
 #' plot(x, type = "spatial")
 #' }
@@ -188,6 +188,7 @@ compare_models <- function(
 #' @param limit_rounding,break_rounding Numeric rounding for map fill limits and
 #'   breaks. Defaults `10` and `5`.
 #' @param base_size Numeric. Base font size. Default `11`.
+#' @param ... Currently ignored.
 #'
 #' @return A `ggplot` object (`type = "index"`) or a `cowplot` grid
 #'   (`type = "spatial"`).
@@ -208,7 +209,8 @@ plot.sdmTMB_model_comparison <- function(
   transform_color_scale = TRUE,
   limit_rounding = 10,
   break_rounding = 5,
-  base_size = 11
+  base_size = 11,
+  ...
 ) {
   if (type == "index") {
     dat <- x$index

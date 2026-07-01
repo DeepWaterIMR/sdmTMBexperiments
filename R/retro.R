@@ -46,7 +46,7 @@
 #'
 #' @importFrom rlang .data
 #' @examples
-#' \donttest{
+#' \dontrun{
 #' mesh <- sdmTMB::make_mesh(sdmTMB::pcod, c("X", "Y"), cutoff = 25)
 #' m <- sdmTMB::sdmTMB(
 #'   data = sdmTMB::pcod,
@@ -175,7 +175,7 @@ sdmTMB_retro <- function(
 #' @import ggplot2
 #' @importFrom rlang .data
 #' @examples
-#' \donttest{
+#' \dontrun{
 #' # retr <- sdmTMB_retro(fit, newdata, nyears = 5)
 #' # plot(retr, index_divisor = 1e3, index_unit = "1000 t")
 #' }

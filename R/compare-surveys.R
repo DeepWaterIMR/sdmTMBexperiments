@@ -271,6 +271,7 @@ compare_surveys <- function(
 #' @param limit_rounding,break_rounding Numeric rounding for map fill limits and
 #'   breaks. Defaults `10` and `5`.
 #' @param base_size Numeric. Base font size. Default `11`.
+#' @param ... Currently ignored.
 #'
 #' @return A `ggplot` object (`type = "index"`/`"scatter"`) or a `cowplot` grid
 #'   (`type = "spatial"`).
@@ -291,7 +292,8 @@ plot.sdmTMB_survey_comparison <- function(
   transform_color_scale = TRUE,
   limit_rounding = 10,
   break_rounding = 5,
-  base_size = 11
+  base_size = 11,
+  ...
 ) {
   surveys <- attributes(x)$surveys
   ref <- attributes(x)$reference_label

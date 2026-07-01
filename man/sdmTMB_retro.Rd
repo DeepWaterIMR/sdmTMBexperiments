@@ -75,7 +75,7 @@ years) and calculates an index for each peel using
 \code{object}.
 }
 \examples{
-\donttest{
+\dontrun{
 mesh <- sdmTMB::make_mesh(sdmTMB::pcod, c("X", "Y"), cutoff = 25)
 m <- sdmTMB::sdmTMB(
   data = sdmTMB::pcod,
