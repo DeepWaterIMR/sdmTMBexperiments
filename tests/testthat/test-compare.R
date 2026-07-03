@@ -58,3 +58,35 @@ test_that("sdmTMB_retro clamps nyears and returns peels", {
   expect_equal(length(rt), n_years)
   expect_s3_class(plot(rt), "ggplot")
 })
+
+test_that("compare_meshes errors clearly (not an NA-CRS crash) when object_crs is omitted", {
+  # Regression test: make_mesh() has no `crs` argument, so a normally built
+  # mesh carries crs = NA (not NULL). An `is.null()`-only guard let that NA
+  # CRS through silently, surfacing later as a cryptic
+  # "missing value where TRUE/FALSE needed" from ggOceanMaps::basemap().
+  skip_on_cran()
+  f <- fit_pcod_models()
+  expect_error(
+    compare_meshes(f$m1, mesh_cutoffs = 40, newdata = f$nd, n_workers = 1),
+    "CRS"
+  )
+})
+
+test_that("compare_models does not silently adopt an NA CRS when object_crs is omitted", {
+  skip_on_cran()
+  f <- fit_pcod_models()
+  cm <- compare_models(f$m1, f$m2, newdata = f$nd, n_workers = 1)
+  crs <- attributes(cm)$crs
+  expect_true(is.null(crs) || !is.na(crs))
+})
+
+test_that("sdmTMB_retro converges on non-terminal peels (refit_meshes = FALSE)", {
+  # Regression test: reusing the fitted sdmTMBmesh unchanged for peeled data
+  # (fewer rows than the mesh's stored loc_xy/A_st) made sdmTMB() error, so
+  # every peel but the terminal one silently fell back to a crashed/NA index.
+  skip_on_cran()
+  f <- fit_pcod_models()
+  rt <- sdmTMB_retro(f$m1, f$nd, nyears = 3, n_workers = 1)
+  crashed <- vapply(rt, function(p) any(p$index$type == "crashed"), logical(1))
+  expect_false(any(crashed))
+})

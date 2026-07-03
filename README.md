@@ -18,10 +18,20 @@ construction, and diagnostic plotting. It doubles as a showcase of how
 to use these functions and a staging ground for methods that may later
 be adopted into `sdmTMB`.
 
-The functions are generic (no species or region is hard-coded) and may
-be freely reused — please cite the function developer. Maps are drawn on
-[ggOceanMaps](https://mikkovihtakari.github.io/ggOceanMaps/) basemaps,
-the package’s default map-plotting tool.
+The functions may be freely reused. Figures are made using
+[ggplot2](https://ggplot2.tidyverse.org/reference/), and can be modified
+using ggplot syntax. Maps are drawn on
+[ggOceanMaps](https://mikkovihtakari.github.io/ggOceanMaps/) basemaps.
+The functions in this package are experimental and likely contain bugs.
+If you spot one, please file an issue or commit a PR.
+
+📖 **[Documentation and full
+walkthrough](https://deepwaterimr.github.io/sdmTMBexperiments/)** —
+start with [Get
+started](https://deepwaterimr.github.io/sdmTMBexperiments/articles/sdmTMBexperiments.html)
+for an end-to-end example, or the [function
+reference](https://deepwaterimr.github.io/sdmTMBexperiments/reference/)
+for individual functions.
 
 ## Installation
 
@@ -34,32 +44,77 @@ remotes::install_github("DeepWaterIMR/sdmTMBexperiments")
 
 ``` r
 library(sdmTMBexperiments)
+#> Loading required package: ggOceanMaps
+#> Loading required package: ggplot2
+#> ggOceanMaps: Using ~/Documents/ggOceanMapsLargeData as data download
+#> folder. This folder is customly defined and does not require
+#> downloading the detailed map data again.
 library(sdmTMB)
 
 mesh <- make_mesh(pcod, c("X", "Y"), cutoff = 20)
-m1 <- sdmTMB(density ~ 0 + as.factor(year), data = pcod,
-             time = "year", mesh = mesh, family = tweedie())
-m2 <- sdmTMB(density ~ 0 + as.factor(year) + depth_scaled, data = pcod,
-             time = "year", mesh = mesh, family = tweedie())
+m1 <- sdmTMB(
+  density ~ 0 + as.factor(year),
+  data = pcod,
+  time = "year",
+  mesh = mesh,
+  family = tweedie()
+)
+m2 <- sdmTMB(
+  density ~ 0 + as.factor(year) + depth_scaled,
+  data = pcod,
+  time = "year",
+  mesh = mesh,
+  family = tweedie()
+)
 nd <- replicate_df(qcs_grid, "year", unique(pcod$year))
 
 # Compare two models: indices, spatial prediction differences, Mohn's rho
 cmp <- compare_models(m1, m2, newdata = nd, object_crs = 32609)
+#> ℹ `ln_tau_O` is an internal parameter affecting `sigma_O`
+#> ℹ `sigma_O` is the spatial standard deviation
+#> ℹ `ln_tau_E` is an internal parameter affecting `sigma_E`
+#> ℹ `sigma_E` is the spatiotemporal standard deviation
+#> ℹ `ln_kappa` is an internal parameter affecting `range`
+#> ℹ `range` is the distance at which data are effectively independent
 plot(cmp)
-plot(cmp, type = "spatial")
-
-# Retrospective analysis
-plot(sdmTMB_retro(m1, nd, nyears = 5))
-
-# Diagnostics
-plot_mesh(mesh, crs = 32609, data = pcod, value = "density")
-plot_residual_qq(m1)
 ```
 
-See `vignette("sdmTMBexperiments")` for an end-to-end walkthrough,
-including survey comparison with the bundled `sebastes` data.
+<img src="man/figures/README-example-1.png" alt="" width="100%" />
+
+``` r
+plot(cmp, type = "spatial")
+```
+
+<img src="man/figures/README-example-2.png" alt="" width="100%" />
+
+This is only a taste of what’s available — see the [Get started
+vignette](https://deepwaterimr.github.io/sdmTMBexperiments/articles/sdmTMBexperiments.html)
+for the full walkthrough: retrospective analysis, mesh-resolution
+sensitivity, diagnostic plots, prediction grids, and survey-specific
+index comparison with the bundled `sebastes` data.
 
 ## Citation
 
-If you use these functions, please cite the package and the function
-developer (Mikko Vihtakari, Institute of Marine Research).
+The functions can be freely reused in sdmTMB development. If you use
+these functions, please cite the function developer (Mikko Vihtakari,
+Institute of Marine Research). If you use the package in publications,
+please cite it:
+
+``` r
+citation("sdmTMBexperiments")
+#> To cite package 'sdmTMBexperiments' in publications use:
+#> 
+#>   Vihtakari M (2026). _sdmTMBexperiments: Experimental Helper Functions
+#>   for 'sdmTMB'_. R package version 0.1.0,
+#>   <https://github.com/DeepWaterIMR/sdmTMBexperiments>.
+#> 
+#> A BibTeX entry for LaTeX users is
+#> 
+#>   @Manual{,
+#>     title = {sdmTMBexperiments: Experimental Helper Functions for 'sdmTMB'},
+#>     author = {Mikko Vihtakari},
+#>     year = {2026},
+#>     note = {R package version 0.1.0},
+#>     url = {https://github.com/DeepWaterIMR/sdmTMBexperiments},
+#>   }
+```

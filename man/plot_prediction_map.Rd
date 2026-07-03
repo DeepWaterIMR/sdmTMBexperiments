@@ -10,7 +10,8 @@ plot_prediction_map(
   column = "est",
   type = c("mean", "annual"),
   time_col = "year",
-  trans = "sqrt",
+  transform = "identity",
+  fill_limits = NULL,
   xy_cols = c("X", "Y"),
   coord_multiplier = 1000,
   base_size = 11
@@ -18,7 +19,11 @@ plot_prediction_map(
 }
 \arguments{
 \item{pred}{A prediction data frame from \code{predict(fit, newdata = ...)},
-containing coordinate columns and the response column.}
+containing coordinate columns and the response column. If the response
+column is on the link scale (the default \code{predict()} output, e.g. log
+density for a log-link family), it can be negative; combine with a
+suitable \code{fill_limits} if you want to floor the colour scale, or use
+\code{predict(fit, newdata = ..., type = "response")} for density-scale values.}
 
 \item{crs}{Coordinate reference system (projected, in metres).}
 
@@ -29,7 +34,15 @@ containing coordinate columns and the response column.}
 \item{time_col}{Character. Name of the time column (for \code{type = "annual"}).
 Default \code{"year"}.}
 
-\item{trans}{Character. Fill-scale transformation. Default \code{"sqrt"}.}
+\item{transform}{Character. Fill-scale transformation, passed to
+\code{transform} in \code{\link[ggplot2:continuous_scale]{ggplot2::continuous_scale()}} (the successor to the
+now-deprecated \code{trans} argument). Default \code{"identity"}.}
+
+\item{fill_limits}{Numeric vector of length two (either element may be
+\code{NA}), passed to \code{limits} in \code{\link[ggplot2:continuous_scale]{ggplot2::continuous_scale()}}. Values outside
+the limits are mapped to \code{NA} by ggplot2 and rendered as blank/grey cells.
+Default \code{NULL}: the scale's range is taken from the data, so no cells are
+dropped. Set e.g. \code{c(0, NA)} to floor a response-scale plot at zero.}
 
 \item{xy_cols}{Character vector of the coordinate columns. Default
 \code{c("X", "Y")}.}
@@ -47,8 +60,20 @@ Maps predicted response values from \code{\link[stats:predict]{stats::predict()}
 \code{\link[ggOceanMaps:basemap]{ggOceanMaps::basemap()}}, either averaged over time (\code{type = "mean"}) or
 faceted by time (\code{type = "annual"}).
 }
+\examples{
+\donttest{
+mesh <- sdmTMB::make_mesh(sdmTMB::pcod, c("X", "Y"), cutoff = 20)
+m <- sdmTMB::sdmTMB(
+  density ~ 0 + as.factor(year), data = sdmTMB::pcod, time = "year",
+  mesh = mesh, family = sdmTMB::tweedie()
+)
+nd <- sdmTMB::replicate_df(sdmTMB::qcs_grid, "year", unique(sdmTMB::pcod$year))
+pred <- predict(m, newdata = nd, type = "response")
+plot_prediction_map(pred, crs = 32609)
+}
+}
 \seealso{
-\code{\link[ggOceanMaps:basemap]{ggOceanMaps::basemap()}}
+\code{\link[ggOceanMaps:basemap]{ggOceanMaps::basemap()}}, \code{\link[ggplot2:continuous_scale]{ggplot2::continuous_scale()}}
 }
 \author{
 Mikko Vihtakari

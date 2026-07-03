@@ -34,19 +34,27 @@
 #' @param silent Logical. Suppress fitting output? Default `TRUE`.
 #'
 #' @return A data frame (tibble) of class `sdmTMB_mesh_cv` with one row per
-#'   cutoff: `cutoff`, `crashed`, `converged`, `sanity`, `sum_loglik`,
-#'   `mean_aic`, and the derived `deltaNLL`, `deltaNLL_pr`, `deltaAIC`,
-#'   `deltaAIC_pr`. The list of [sdmTMB::sdmTMB_cv()] objects is attached as the
-#'   `"cv"` attribute.
+#'   cutoff: `cutoff`, `crashed`, `converged`, `sanity`, `sum_loglik` (the
+#'   summed hold-out log-likelihood from [sdmTMB::sdmTMB_cv()]; higher is
+#'   better), `mean_aic`, and the derived `deltaNLL`, `deltaNLL_pr`,
+#'   `deltaAIC`, `deltaAIC_pr`. `deltaNLL`/`deltaAIC` are relative to the
+#'   best-fitting cutoff (`0` = best; lower is better, mirroring AIC). The
+#'   list of [sdmTMB::sdmTMB_cv()] objects is attached as the `"cv"`
+#'   attribute.
 #'
 #' @author Mikko Vihtakari
 #' @seealso [sdmTMB::sdmTMB_cv()], [blockCV::cv_spatial()], [compare_meshes()]
 #'
 #' @importFrom rlang .data
 #' @examples
-#' \dontrun{
+#' \donttest{
 #' # Requires the 'blockCV' package.
-#' cv <- sdmTMB_mesh_cv(fit, mesh_cutoffs = c(50, 70, 100), k = 3)
+#' mesh <- sdmTMB::make_mesh(sdmTMB::pcod, c("X", "Y"), cutoff = 20)
+#' fit <- sdmTMB::sdmTMB(
+#'   data = sdmTMB::pcod, formula = density ~ 0 + as.factor(year),
+#'   time = "year", mesh = mesh, family = sdmTMB::tweedie(link = "log")
+#' )
+#' cv <- sdmTMB_mesh_cv(fit, mesh_cutoffs = c(15, 30), k = 3)
 #' cv
 #' plot(cv)
 #' }
@@ -176,8 +184,10 @@ sdmTMB_mesh_cv <- function(
     dplyr::bind_rows() |>
     dplyr::arrange(dplyr::desc(.data$sum_loglik)) |>
     dplyr::mutate(
-      deltaNLL = .data$sum_loglik - max(.data$sum_loglik, na.rm = TRUE),
-      deltaNLL_pr = 100 * (1 - .data$sum_loglik / max(.data$sum_loglik, na.rm = TRUE)),
+      # sum_loglik is a log-likelihood (higher = better); NLL flips the sign
+      # so that, like AIC, lower (0 = best) indicates the better-fitting mesh.
+      deltaNLL = -.data$sum_loglik - min(-.data$sum_loglik, na.rm = TRUE),
+      deltaNLL_pr = 100 * (-.data$sum_loglik / min(-.data$sum_loglik, na.rm = TRUE) - 1),
       deltaAIC = .data$mean_aic - min(.data$mean_aic, na.rm = TRUE),
       deltaAIC_pr = 100 * (.data$mean_aic / min(.data$mean_aic, na.rm = TRUE) - 1)
     )
@@ -190,8 +200,8 @@ sdmTMB_mesh_cv <- function(
 #' Plot mesh cross-validation results
 #'
 #' @param x An object of class `sdmTMB_mesh_cv` from [sdmTMB_mesh_cv()].
-#' @param metric Character. Which metric to plot: `"sum_loglik"` (default) or
-#'   `"deltaAIC"`.
+#' @param metric Character. Which metric to plot: `"deltaNLL"` (default),
+#'   `"sum_loglik"`, or `"deltaAIC"`.
 #' @param base_size Numeric. Base font size. Default `11`.
 #' @param ... Currently ignored.
 #'
@@ -200,10 +210,22 @@ sdmTMB_mesh_cv <- function(
 #' @seealso [sdmTMB_mesh_cv()]
 #' @import ggplot2
 #' @importFrom rlang .data
+#' @examples
+#' \donttest{
+#' # Requires the 'blockCV' package.
+#' mesh <- sdmTMB::make_mesh(sdmTMB::pcod, c("X", "Y"), cutoff = 20)
+#' fit <- sdmTMB::sdmTMB(
+#'   data = sdmTMB::pcod, formula = density ~ 0 + as.factor(year),
+#'   time = "year", mesh = mesh, family = sdmTMB::tweedie(link = "log")
+#' )
+#' cv <- sdmTMB_mesh_cv(fit, mesh_cutoffs = c(15, 30), k = 3)
+#' plot(cv)
+#' plot(cv, metric = "deltaAIC")
+#' }
 #' @method plot sdmTMB_mesh_cv
 #' @export
-plot.sdmTMB_mesh_cv <- function(x, metric = "sum_loglik", base_size = 11, ...) {
-  metric <- match.arg(metric, c("sum_loglik", "deltaAIC"))
+plot.sdmTMB_mesh_cv <- function(x, metric = "deltaNLL", base_size = 11, ...) {
+  metric <- match.arg(metric, c("deltaNLL", "sum_loglik", "deltaAIC"))
   ggplot2::ggplot(
     x, ggplot2::aes(x = factor(.data$cutoff), y = .data[[metric]])
   ) +

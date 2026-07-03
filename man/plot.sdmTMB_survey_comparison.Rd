@@ -10,7 +10,9 @@
   index_divisor = NULL,
   unit = NA,
   viridis = FALSE,
-  spatial_response = "pr_mean",
+  annotate_fit = TRUE,
+  spatial_response = "mean_pr_diff",
+  fill_prefix = NULL,
   transform_color_scale = TRUE,
   limit_rounding = 10,
   break_rounding = 5,
@@ -30,8 +32,18 @@
 \item{viridis}{Logical. Use the viridis palette for survey series? Default
 \code{FALSE}.}
 
+\item{annotate_fit}{Logical. For \code{type = "scatter"}, annotate each survey's
+panel-free regression line with its fitted equation and R², coloured to
+match that survey? Default \code{TRUE}.}
+
 \item{spatial_response}{Character. Column mapped in spatial plots: \code{"mean"},
-\code{"pr_mean"} or \code{"mean_pr_diff"}. Default \code{"pr_mean"}.}
+\code{"pr_mean"} or \code{"mean_pr_diff"}. Default \code{"mean_pr_diff"}. See Details.}
+
+\item{fill_prefix}{Character. Prefix for the spatial-plot fill legend title
+(\code{type = "spatial"}), e.g. \code{"Biomass density"} or \code{"CPUE"}. If \code{NULL}
+(default), the legend title is \code{"Percent anomaly"}; otherwise
+\code{paste(fill_prefix, "percent anomaly", sep = "\\n")}. Surveys don't
+necessarily share a response variable, so this isn't inferred automatically.}
 
 \item{transform_color_scale}{Logical. Apply a signed square-root colour scale
 for spatial plots? Default \code{TRUE}.}
@@ -52,6 +64,63 @@ Plots the results of \code{\link[=compare_surveys]{compare_surveys()}} as a time
 (\code{type = "index"}), a scatter plot of survey vs compiled indices
 (\code{type = "scatter"}), or a spatial prediction-difference map
 (\code{type = "spatial"}, on a \code{\link[ggOceanMaps:basemap]{ggOceanMaps::basemap()}}).
+}
+\details{
+For \code{type = "spatial"}, each grid cell is compared between a survey's
+fitted model and the compiled reference model, for every year they share,
+on the response scale (i.e. \code{predict(..., type = "response")}, e.g.
+density rather than log density): \code{diff = est - ref_est} and
+\code{pr_diff = 100 * diff / ref_est} (percent). \code{spatial_response} selects how
+these per-year values are summarised across years into the single value
+mapped for each cell:
+\itemize{
+\item \code{"mean"}: \code{mean(diff)} — the average absolute difference, in response
+units. Useful for the raw magnitude of disagreement, but not comparable
+across cells with very different baseline abundance.
+\item \code{"pr_mean"}: \code{mean(pr_diff)} — the average of the yearly percent
+differences. Because each year is divided by that year's own (possibly
+small) reference value, a handful of low-abundance years/cells can
+dominate this average with large percentage swings even when the
+absolute difference is small.
+\item \code{"mean_pr_diff"} (default): \code{100 * mean(diff) / mean(ref_est)} — the
+percent difference between the across-year mean predictions (a ratio of
+means, not a mean of ratios). This is usually the more robust
+percent-based summary, since a cell's overall multi-year baseline is used
+in the denominator instead of each individual year's value.
+}
+}
+\examples{
+\donttest{
+data(sebastes)
+sub <- subset(sebastes, cruiseseries \%in\% c("EcoS", "WinterS") & year >= 2020)
+compiled_mesh <- sdmTMB::make_mesh(sub, c("X", "Y"), cutoff = 50)
+# `biomass` (raw catch), not `density`, is the response: `density` is
+# already swept_area-normalised, so pairing it with the swept_area offset
+# below would double-correct for effort.
+compiled_model <- sdmTMB::sdmTMB(
+  biomass ~ 0 + as.factor(year), data = sub, time = "year",
+  mesh = compiled_mesh, family = sdmTMB::tweedie(), spatiotemporal = "off",
+  offset = log(sub$swept_area)
+)
+full_region <- make_survey_prediction_region(sub, crs = 32633, concavity = 5)
+full_grid <- sdmTMB::replicate_df(
+  make_prediction_grid(full_region, resolution = 20), "year", unique(sub$year)
+)
+# swept_area is in square nautical miles, so cell area must be too: convert
+# the 20 km grid resolution to nautical miles before squaring.
+cell_area <- (20 / 1.852)^2
+compiled_index <- sdmTMB::get_index_split(
+  compiled_model, newdata = full_grid, area = cell_area, nsplit = 3, silent = TRUE
+)
+sc <- compare_surveys(
+  data = sub, compiled_index = compiled_index, compiled_model = compiled_model,
+  surveys = c("EcoS", "WinterS"), newdata = full_grid, object_crs = 32633,
+  mesh_cutoff = 50, offset_col = "swept_area", area = cell_area
+)
+plot(sc)                                              # scaled index time series
+plot(sc, type = "scatter", annotate_fit = TRUE)       # survey vs compiled
+plot(sc, type = "spatial", fill_prefix = "Biomass density") # prediction differences
+}
 }
 \seealso{
 \code{\link[=compare_surveys]{compare_surveys()}}

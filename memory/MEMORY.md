@@ -16,8 +16,9 @@ maintainer's public package metadata. Use placeholders: `~/...`,
 - [Architecture](architecture.md) — shared internals, function families, S3 classes
 - [Naming conventions](naming-conventions.md) — sdmTMB alignment decisions + name map
 - [Example data](example-data.md) — `sebastes` provenance and regeneration
-- [Known fixes](known-fixes.md) — bugs fixed while porting from the source repo
+- [Known fixes](known-fixes.md) — audit trail of bugs found and fixed (porting-era and later)
 - [Roadmap](roadmap.md) — future work and CRAN readiness
+- [Examples policy](examples-policy.md) — `\donttest{}` (pkgdown runs it by default) + `_R_CHECK_DONTTEST_EXAMPLES_: false` in CI to keep `R CMD check` fast
 
 ## Who I work with
 

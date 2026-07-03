@@ -29,6 +29,14 @@ jobs:
     env:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
       R_KEEP_PKG_SOURCE: yes
+      # Examples are wrapped in \donttest{} (not \dontrun{}) so pkgdown renders
+      # them by default; most fit an actual sdmTMB model (seconds to tens of
+      # seconds), too slow to run on every check across 5 CI jobs, and
+      # --as-cran otherwise forces \donttest{} to run. Explicitly setting this
+      # env var overrides that default (R only falls back to --as-cran's value
+      # when the var is unset), skipping \donttest{} here without needing
+      # \dontrun{}. See memory/examples-policy.md.
+      _R_CHECK_DONTTEST_EXAMPLES_: false
 
     steps:
       - uses: actions/checkout@v4

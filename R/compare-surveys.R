@@ -60,6 +60,41 @@
 #'   [make_survey_prediction_region()]
 #'
 #' @importFrom rlang .data
+#' @examples
+#' \donttest{
+#' data(sebastes)
+#' sub <- subset(sebastes, cruiseseries %in% c("EcoS", "WinterS") & year >= 2020)
+#'
+#' # A simple "compiled" full-domain model and index, used as the reference.
+#' # `biomass` (raw catch), not `density`, is the response here: `density` is
+#' # already swept_area-normalised, so using it together with the swept_area
+#' # offset below would double-correct for effort.
+#' compiled_mesh <- sdmTMB::make_mesh(sub, c("X", "Y"), cutoff = 50)
+#' compiled_model <- sdmTMB::sdmTMB(
+#'   biomass ~ 0 + as.factor(year), data = sub, time = "year",
+#'   mesh = compiled_mesh, family = sdmTMB::tweedie(), spatiotemporal = "off",
+#'   offset = log(sub$swept_area)
+#' )
+#' full_region <- make_survey_prediction_region(sub, crs = 32633, concavity = 5)
+#' full_grid <- sdmTMB::replicate_df(
+#'   make_prediction_grid(full_region, resolution = 20), "year", unique(sub$year)
+#' )
+#' # swept_area is in square nautical miles, so cell area must be too: convert
+#' # the 20 km grid resolution to nautical miles before squaring.
+#' cell_area <- (20 / 1.852)^2
+#' compiled_index <- sdmTMB::get_index_split(
+#'   compiled_model, newdata = full_grid, area = cell_area, nsplit = 3, silent = TRUE
+#' )
+#'
+#' sc <- compare_surveys(
+#'   data = sub, compiled_index = compiled_index, compiled_model = compiled_model,
+#'   surveys = c("EcoS", "WinterS"), newdata = full_grid, object_crs = 32633,
+#'   mesh_cutoff = 50, offset_col = "swept_area", area = cell_area
+#' )
+#' plot(sc)
+#' plot(sc, type = "scatter")
+#' plot(sc, type = "spatial", fill_prefix = "Biomass density")
+#' }
 #' @export
 compare_surveys <- function(
   data,
@@ -111,10 +146,14 @@ compare_surveys <- function(
     }
     if (is.null(control)) control <- compiled_model$control
     if (is.null(object_crs)) {
-      if (is.null(compiled_model$spde$mesh$crs)) {
+      mesh_crs <- compiled_model$spde$mesh$crs
+      # make_mesh() has no `crs` argument, so a mesh built the usual way
+      # carries an NA (not NULL) crs; catch both, otherwise this silently
+      # passes an NA CRS through to the spatial plot.
+      if (is.null(mesh_crs) || is.na(sf::st_crs(mesh_crs))) {
         stop("CRS not found in compiled_model mesh. Specify `object_crs`.")
       }
-      object_crs <- sf::st_crs(compiled_model$spde$mesh$crs)
+      object_crs <- sf::st_crs(mesh_crs)
     }
     time_col <- compiled_model$time
   } else {
@@ -258,14 +297,44 @@ compare_surveys <- function(
 #' (`type = "scatter"`), or a spatial prediction-difference map
 #' (`type = "spatial"`, on a [ggOceanMaps::basemap()]).
 #'
+#' @details
+#' For `type = "spatial"`, each grid cell is compared between a survey's
+#' fitted model and the compiled reference model, for every year they share,
+#' on the response scale (i.e. `predict(..., type = "response")`, e.g.
+#' density rather than log density): `diff = est - ref_est` and
+#' `pr_diff = 100 * diff / ref_est` (percent). `spatial_response` selects how
+#' these per-year values are summarised across years into the single value
+#' mapped for each cell:
+#' * `"mean"`: `mean(diff)` — the average absolute difference, in response
+#'   units. Useful for the raw magnitude of disagreement, but not comparable
+#'   across cells with very different baseline abundance.
+#' * `"pr_mean"`: `mean(pr_diff)` — the average of the yearly percent
+#'   differences. Because each year is divided by that year's own (possibly
+#'   small) reference value, a handful of low-abundance years/cells can
+#'   dominate this average with large percentage swings even when the
+#'   absolute difference is small.
+#' * `"mean_pr_diff"` (default): `100 * mean(diff) / mean(ref_est)` — the
+#'   percent difference between the across-year mean predictions (a ratio of
+#'   means, not a mean of ratios). This is usually the more robust
+#'   percent-based summary, since a cell's overall multi-year baseline is used
+#'   in the denominator instead of each individual year's value.
+#'
 #' @param x An object of class `sdmTMB_survey_comparison`.
 #' @param type Character. `"index"` (default), `"scatter"` or `"spatial"`.
 #' @param index_divisor Optional numeric divisor applied to index values.
 #' @param unit Character. Unit label. If `NA`, `"Index value"` is used.
 #' @param viridis Logical. Use the viridis palette for survey series? Default
 #'   `FALSE`.
+#' @param annotate_fit Logical. For `type = "scatter"`, annotate each survey's
+#'   panel-free regression line with its fitted equation and R², coloured to
+#'   match that survey? Default `TRUE`.
 #' @param spatial_response Character. Column mapped in spatial plots: `"mean"`,
-#'   `"pr_mean"` or `"mean_pr_diff"`. Default `"pr_mean"`.
+#'   `"pr_mean"` or `"mean_pr_diff"`. Default `"mean_pr_diff"`. See Details.
+#' @param fill_prefix Character. Prefix for the spatial-plot fill legend title
+#'   (`type = "spatial"`), e.g. `"Biomass density"` or `"CPUE"`. If `NULL`
+#'   (default), the legend title is `"Percent anomaly"`; otherwise
+#'   `paste(fill_prefix, "percent anomaly", sep = "\n")`. Surveys don't
+#'   necessarily share a response variable, so this isn't inferred automatically.
 #' @param transform_color_scale Logical. Apply a signed square-root colour scale
 #'   for spatial plots? Default `TRUE`.
 #' @param limit_rounding,break_rounding Numeric rounding for map fill limits and
@@ -280,6 +349,38 @@ compare_surveys <- function(
 #' @seealso [compare_surveys()]
 #' @import ggplot2
 #' @importFrom rlang .data
+#' @examples
+#' \donttest{
+#' data(sebastes)
+#' sub <- subset(sebastes, cruiseseries %in% c("EcoS", "WinterS") & year >= 2020)
+#' compiled_mesh <- sdmTMB::make_mesh(sub, c("X", "Y"), cutoff = 50)
+#' # `biomass` (raw catch), not `density`, is the response: `density` is
+#' # already swept_area-normalised, so pairing it with the swept_area offset
+#' # below would double-correct for effort.
+#' compiled_model <- sdmTMB::sdmTMB(
+#'   biomass ~ 0 + as.factor(year), data = sub, time = "year",
+#'   mesh = compiled_mesh, family = sdmTMB::tweedie(), spatiotemporal = "off",
+#'   offset = log(sub$swept_area)
+#' )
+#' full_region <- make_survey_prediction_region(sub, crs = 32633, concavity = 5)
+#' full_grid <- sdmTMB::replicate_df(
+#'   make_prediction_grid(full_region, resolution = 20), "year", unique(sub$year)
+#' )
+#' # swept_area is in square nautical miles, so cell area must be too: convert
+#' # the 20 km grid resolution to nautical miles before squaring.
+#' cell_area <- (20 / 1.852)^2
+#' compiled_index <- sdmTMB::get_index_split(
+#'   compiled_model, newdata = full_grid, area = cell_area, nsplit = 3, silent = TRUE
+#' )
+#' sc <- compare_surveys(
+#'   data = sub, compiled_index = compiled_index, compiled_model = compiled_model,
+#'   surveys = c("EcoS", "WinterS"), newdata = full_grid, object_crs = 32633,
+#'   mesh_cutoff = 50, offset_col = "swept_area", area = cell_area
+#' )
+#' plot(sc)                                              # scaled index time series
+#' plot(sc, type = "scatter", annotate_fit = TRUE)       # survey vs compiled
+#' plot(sc, type = "spatial", fill_prefix = "Biomass density") # prediction differences
+#' }
 #' @method plot sdmTMB_survey_comparison
 #' @export
 plot.sdmTMB_survey_comparison <- function(
@@ -288,7 +389,9 @@ plot.sdmTMB_survey_comparison <- function(
   index_divisor = NULL,
   unit = NA,
   viridis = FALSE,
-  spatial_response = "pr_mean",
+  annotate_fit = TRUE,
+  spatial_response = "mean_pr_diff",
+  fill_prefix = NULL,
   transform_color_scale = TRUE,
   limit_rounding = 10,
   break_rounding = 5,
@@ -331,10 +434,9 @@ plot.sdmTMB_survey_comparison <- function(
           x = "Year", color = "Model", fill = "Model"
         ) +
         ggplot2::expand_limits(y = 0) +
-        ggplot2::coord_cartesian(expand = FALSE) +
         ggplot2::scale_y_continuous(n.breaks = 6) +
-        ggplot2::scale_x_continuous(breaks = scales::pretty_breaks(n = 10)) +
         ggplot2::theme_classic(base_size = base_size) +
+        .index_axis_layers() +
         ggplot2::theme(legend.position = "bottom")
     )
   }
@@ -351,16 +453,51 @@ plot.sdmTMB_survey_comparison <- function(
       dplyr::filter(.data$model == ref) |>
       dplyr::select(.data$year, ref_est = .data$est)
 
-    return(
-      dat |>
-        dplyr::filter(.data$model != ref) |>
-        dplyr::left_join(ref_dat, by = "year") |>
-        ggplot2::ggplot(ggplot2::aes(
-          x = .data$ref_est, y = .data$est, color = .data$model
-        )) +
+    scatter_dat <- dat |>
+      dplyr::filter(.data$model != ref) |>
+      dplyr::left_join(ref_dat, by = "year")
+
+    p <- ggplot2::ggplot(
+        scatter_dat,
+        ggplot2::aes(x = .data$ref_est, y = .data$est, color = .data$model)
+      ) +
         ggplot2::geom_point() +
         ggplot2::geom_smooth(method = "lm", se = FALSE, formula = y ~ x) +
-        ggplot2::scale_color_manual(values = survey_colors) +
+        ggplot2::scale_color_manual(values = survey_colors)
+
+    if (isTRUE(annotate_fit)) {
+      fit_labs <- lapply(surveys, function(s) {
+        d <- dplyr::filter(scatter_dat, .data$model == s)
+        if (sum(stats::complete.cases(d$ref_est, d$est)) < 2) return(NULL)
+        m <- stats::lm(est ~ ref_est, data = d)
+        cf <- stats::coef(m)
+        r2 <- summary(m)$r.squared
+        sign_op <- if (cf[2] < 0) "-" else "+"
+        data.frame(
+          model = s,
+          label = sprintf(
+            "y = %.3g %s %.3gx\nR² = %.2f", cf[1], sign_op, abs(cf[2]), r2
+          )
+        )
+      }) |>
+        dplyr::bind_rows()
+      fit_labs$model <- factor(fit_labs$model, levels = surveys)
+      fit_labs <- fit_labs[order(fit_labs$model), ]
+      fit_labs$vjust <- seq_len(nrow(fit_labs)) * 2.2 - 1
+
+      p <- p + ggplot2::geom_text(
+        data = fit_labs,
+        ggplot2::aes(
+          x = -Inf, y = Inf, label = .data$label, color = .data$model,
+          vjust = .data$vjust
+        ),
+        hjust = -0.08, size = base_size / 3.5, inherit.aes = FALSE,
+        show.legend = FALSE
+      )
+    }
+
+    return(
+      p +
         ggplot2::labs(
           x = if (!is.na(unit)) paste0(ref, " index (", unit, ")") else paste0(ref, " index"),
           y = if (!is.na(unit)) paste0("Survey index (", unit, ")") else "Survey index",
@@ -375,15 +512,29 @@ plot.sdmTMB_survey_comparison <- function(
     if (is.null(x$grid)) {
       stop("No spatial grid available. Re-run compare_surveys() with a compiled_model.")
     }
+    # The bare "Percent anomaly" (no "Biomass density" prefix) default only
+    # applies to percent-based responses; a "mean" (absolute) response keeps
+    # .spatial_diff_map()'s own label so it isn't mislabelled as a percent.
+    is_pct_response <- spatial_response %in% .pct_spatial_responses
     return(cowplot::plot_grid(
       plotlist = lapply(seq_along(x$grid), function(i) {
-        .spatial_diff_map(
+        p <- .spatial_diff_map(
           grid = x$grid[[i]], crs = attributes(x)$crs,
           spatial_response = spatial_response, unit = unit,
           transform_color_scale = transform_color_scale,
           limit_rounding = limit_rounding, break_rounding = break_rounding,
-          base_size = base_size, title = paste(names(x$grid)[i], "vs", ref)
+          base_size = base_size, title = paste(names(x$grid)[i], "vs", ref),
+          fill_prefix = fill_prefix
         )
+        if (is_pct_response) {
+          fill_lab <- if (is.null(fill_prefix)) {
+            "Percent anomaly"
+          } else {
+            paste(fill_prefix, "percent anomaly", sep = "\n")
+          }
+          p <- p + ggplot2::labs(fill = fill_lab)
+        }
+        p
       })
     ))
   }

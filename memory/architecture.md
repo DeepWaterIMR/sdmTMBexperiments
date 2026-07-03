@@ -27,9 +27,34 @@
   years and returns per-cell `est`, `ref_est`, `diff`, `pr_diff` (+ `depth`).
 - `.spatial_diff_map()` — builds one ggOceanMaps spatial-difference map;
   aggregates over years, converts to `sf`, applies the signed-sqrt colour scale.
-  Shared by the three comparison `plot()` methods.
+  Shared by the three comparison `plot()` methods. Takes a `fill_prefix`
+  argument (its own percent-vs-absolute label logic, shared via
+  `.pct_spatial_responses`) so callers no longer need to override the fill
+  legend label after the fact.
 - `.safe_brewer(n, palette)` — RColorBrewer wrapper valid for any `n`.
 - `.negsqrt_trans()` — signed square-root scales transformation.
+- `.diverging_breaks(limits, rounding, n)` — break points for
+  `.spatial_diff_map()`'s diverging fill scale: always includes the exact
+  limits and `0` (when spanned), then de-crowds additional breaks (minimum
+  gap in the same signed-sqrt space the scale uses) rather than forcing a
+  fixed count. Paired with `scales::label_number(scale_cut =
+  scales::cut_short_scale())` for abbreviated labels (`"-9.2K"`).
+- `.pct_spatial_responses` — the `spatial_response` values that are
+  percentages (`pr_anomaly`, `total_pr_anomaly`, `max_pr_anomaly`, `pr_mean`,
+  `mean_pr_diff`), vs. absolute response-unit differences (e.g. `"mean"`).
+  Shared between `.spatial_diff_map()`'s fill-label logic and the two
+  comparison `plot()` methods that build a `fill_prefix` on top of it.
+- `.index_axis_layers()` — shared `coord_cartesian(expand = FALSE, clip =
+  "off")` + x-axis breaks (`.year_breaks()`) + wider `plot.margin` for every
+  yearly index plot (`plot_index()` and the `type = "index"` methods of the
+  three comparison functions and `sdmTMB_retro()`). Must be added *after* the
+  complete theme (`theme_classic()`/`theme_bw()`) in each caller — a complete
+  theme replaces the whole theme when added with `+`, so adding it earlier
+  silently discards the margin override.
+- `.year_breaks(n)` — x-axis breaks for `.index_axis_layers()`: whole-year
+  ranges get whole-year `pretty()` breaks (never `2020.0`/`2020.5`), falling
+  back to `scales::extended_breaks()` only when the axis range itself isn't
+  whole numbers.
 - `.index_color_vector` — fixed palette (reference series drawn black).
 
 ## S3 classes

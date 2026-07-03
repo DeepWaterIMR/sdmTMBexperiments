@@ -2,7 +2,6 @@
 
 ## Near term
 - Expand test coverage (currently `pcod` + `sebastes` smoke/behaviour tests).
-- Add a `pkgdown` reference grouping and a fuller `_pkgdown.yml`.
 - Consider a `barrier`-mesh path for `compare_meshes()` (currently plain meshes
   only; the source repo had commented-out `sdmTMBextra::add_barrier_mesh()`).
 
@@ -18,7 +17,10 @@ Several functions are candidates for `sdmTMB` itself (e.g. `sdmTMB_retro()`,
 `sdmTMB` so adoption is low-friction.
 
 ## CRAN readiness
-- Ensure examples that fit models are wrapped in `\donttest{}` / `\dontrun{}`.
+- Ensure examples that fit models are wrapped in `\donttest{}` (see
+  [examples-policy.md](examples-policy.md); CI overrides
+  `_R_CHECK_DONTTEST_EXAMPLES_` so these stay fast in `R CMD check` while still
+  rendering on the pkgdown site).
 - Keep bundled data < ~1 MB.
 - Target `R CMD check --as-cran` with 0 errors / 0 warnings; document acceptable
   notes.

@@ -39,7 +39,7 @@
 #'
 #' @importFrom rlang .data
 #' @examples
-#' \dontrun{
+#' \donttest{
 #' mesh <- sdmTMB::make_mesh(sdmTMB::pcod, c("X", "Y"), cutoff = 20)
 #' m <- sdmTMB::sdmTMB(
 #'   data = sdmTMB::pcod, formula = density ~ 0 + as.factor(year),
@@ -47,7 +47,8 @@
 #' )
 #' nd <- sdmTMB::replicate_df(sdmTMB::qcs_grid, "year", unique(sdmTMB::pcod$year))
 #' mesh_indices <- compare_meshes(
-#'   object = m, mesh_cutoffs = c(10, 30), newdata = nd, reference_name = "20 km"
+#'   object = m, mesh_cutoffs = c(10, 30), newdata = nd, object_crs = 32609,
+#'   reference_name = "20 km"
 #' )
 #' plot(mesh_indices)
 #' }
@@ -80,10 +81,14 @@ compare_meshes <- function(
   }
 
   if (is.null(object_crs)) {
-    if (is.null(object$spde$mesh$crs)) {
+    mesh_crs <- object$spde$mesh$crs
+    # make_mesh() has no `crs` argument, so a mesh built the usual way
+    # carries an NA (not NULL) crs; catch both, otherwise this silently
+    # passes an NA CRS through to the spatial plot (see compare_surveys()).
+    if (is.null(mesh_crs) || is.na(sf::st_crs(mesh_crs))) {
       stop("Model CRS not found in the mesh object. Specify `object_crs`.")
     }
-    object_crs <- sf::st_crs(object$spde$mesh$crs)
+    object_crs <- sf::st_crs(mesh_crs)
   }
 
   old_plan <- .setup_parallel(n_workers)
@@ -159,12 +164,20 @@ compare_meshes <- function(
           cutoff = cutoff_name, year = newdata[[object$time]],
           X = newdata$X, Y = newdata$Y,
           depth = if ("depth" %in% names(newdata)) newdata$depth else NA,
-          est = NA, ref_est = NA, diff = NA, pr_diff = NA
+          est = NA, ref_est = NA, diff = NA, pr_diff = NA, mean_pr_diff = NA
         ))
       }
       base <- .pred_diff_base(k, ref_mod, newdata, object$time)
       base$cutoff <- cutoff_name
-      base
+      base |>
+        dplyr::group_by(.data$cutoff, .data$X, .data$Y) |>
+        # See `.pred_diff_base()`/`.spatial_diff_map()` for why this ratio-of-
+        # means differs from (and is more robust than) mean(pr_diff).
+        dplyr::mutate(
+          mean_pr_diff = 100 * mean(.data$diff, na.rm = TRUE) /
+            mean(.data$ref_est, na.rm = TRUE)
+        ) |>
+        dplyr::ungroup()
     },
     future.seed = future_seed
   )
@@ -188,14 +201,41 @@ compare_meshes <- function(
 #' black, alternative cutoffs in colour, with Mohn's rho annotated), or spatial
 #' maps of prediction differences on a [ggOceanMaps::basemap()].
 #'
+#' @details
+#' For `type = "spatial"`, each grid cell is compared between a model fitted
+#' with an alternative mesh cutoff and the model fitted with the reference
+#' cutoff, for every year they share, on the response scale (i.e.
+#' `predict(..., type = "response")`, e.g. density rather than log density):
+#' `diff = est - ref_est` and `pr_diff = 100 * diff / ref_est` (percent).
+#' `spatial_response` selects how these per-year values are summarised across
+#' years into the single value mapped for each cell:
+#' * `"mean"`: `mean(diff)` — the average absolute difference, in response
+#'   units. Useful for the raw magnitude of disagreement, but not comparable
+#'   across cells with very different baseline abundance.
+#' * `"pr_mean"`: `mean(pr_diff)` — the average of the yearly percent
+#'   differences. Because each year is divided by that year's own (possibly
+#'   small) reference value, a handful of low-abundance years/cells can
+#'   dominate this average with large percentage swings even when the
+#'   absolute difference is small.
+#' * `"mean_pr_diff"` (default): `100 * mean(diff) / mean(ref_est)` — the
+#'   percent difference between the across-year mean predictions (a ratio of
+#'   means, not a mean of ratios). This is usually the more robust
+#'   percent-based summary, since a cell's overall multi-year baseline is used
+#'   in the denominator instead of each individual year's value.
+#'
 #' @param x An object of class `sdmTMB_mesh_comparison`.
 #' @param type Character. `"index"` (default) or `"spatial"`.
 #' @param index_divisor Optional numeric divisor applied to index values.
 #' @param unit Character. Unit label. If `NA`, `"Index value"` is used.
+#' @param mohn Logical. Annotate the index plot with Mohn's rho (via
+#'   [mohns_rho()])? Default `FALSE`. Only applies when `type = "index"`.
+#' @param cutoff_label Character. Label for the cutoff colour/fill legend.
+#'   Default `"Cutoff"`.
 #' @param viridis Logical. Use the viridis palette for cutoff levels? If `FALSE`
 #'   (default), a palette-safe Set1 is used.
-#' @param spatial_response Character. Column mapped in spatial plots: `"mean"` or
-#'   `"pr_mean"`. Default `"pr_mean"`.
+#' @param spatial_response Character. Column mapped in spatial plots: one of
+#'   `"mean"`, `"pr_mean"` or `"mean_pr_diff"`. Default `"mean_pr_diff"`. See
+#'   Details.
 #' @param transform_color_scale Logical. Apply a signed square-root colour scale
 #'   for spatial plots? Default `TRUE`.
 #' @param limit_rounding,break_rounding Numeric rounding for map fill limits and
@@ -210,6 +250,21 @@ compare_meshes <- function(
 #' @seealso [compare_meshes()]
 #' @import ggplot2
 #' @importFrom rlang .data
+#' @examples
+#' \donttest{
+#' mesh <- sdmTMB::make_mesh(sdmTMB::pcod, c("X", "Y"), cutoff = 20)
+#' m <- sdmTMB::sdmTMB(
+#'   data = sdmTMB::pcod, formula = density ~ 0 + as.factor(year),
+#'   time = "year", mesh = mesh, family = sdmTMB::tweedie(link = "log")
+#' )
+#' nd <- sdmTMB::replicate_df(sdmTMB::qcs_grid, "year", unique(sdmTMB::pcod$year))
+#' mesh_indices <- compare_meshes(
+#'   object = m, mesh_cutoffs = c(10, 30), newdata = nd, object_crs = 32609,
+#'   reference_name = "20 km"
+#' )
+#' plot(mesh_indices, cutoff_label = "Cutoff (km)")
+#' plot(mesh_indices, type = "spatial")
+#' }
 #' @method plot sdmTMB_mesh_comparison
 #' @export
 plot.sdmTMB_mesh_comparison <- function(
@@ -217,8 +272,10 @@ plot.sdmTMB_mesh_comparison <- function(
   type = "index",
   index_divisor = NULL,
   unit = NA,
+  mohn = FALSE,
+  cutoff_label = "Cutoff",
   viridis = FALSE,
-  spatial_response = "pr_mean",
+  spatial_response = "mean_pr_diff",
   transform_color_scale = TRUE,
   limit_rounding = 10,
   break_rounding = 5,
@@ -234,10 +291,6 @@ plot.sdmTMB_mesh_comparison <- function(
       )
     }
 
-    rho <- mohns_rho(dat, group_col = "cutoff",
-                     reference = attributes(x)$reference_name)
-    rho_lab <- data.frame(label = paste("Mohn's rho = ", round(rho, 3)))
-
     n_other <- length(unique(dat$cutoff)) - 1
     index_colors <- if (viridis) {
       c("black", viridis::viridis(n_other))
@@ -245,8 +298,7 @@ plot.sdmTMB_mesh_comparison <- function(
       c("black", .safe_brewer(n_other, "Set1"))
     }
 
-    return(
-      ggplot2::ggplot(
+    p <- ggplot2::ggplot(
         dat,
         ggplot2::aes(
           x = .data$year, y = .data$est, ymin = .data$lwr, ymax = .data$upr,
@@ -256,21 +308,29 @@ plot.sdmTMB_mesh_comparison <- function(
         ggplot2::geom_ribbon(color = NA, alpha = 0.2) +
         ggplot2::geom_path() +
         ggplot2::scale_color_manual(values = index_colors) +
-        ggplot2::scale_fill_manual(values = index_colors) +
-        ggplot2::geom_text(
-          data = rho_lab, ggplot2::aes(-Inf, Inf, label = .data$label),
-          vjust = 2, hjust = -0.25, size = base_size / 2.845276,
-          inherit.aes = FALSE
-        ) +
+        ggplot2::scale_fill_manual(values = index_colors)
+
+    if (isTRUE(mohn)) {
+      rho <- mohns_rho(dat, group_col = "cutoff",
+                       reference = attributes(x)$reference_name)
+      rho_lab <- data.frame(label = paste("Mohn's rho = ", round(rho, 3)))
+      p <- p + ggplot2::geom_text(
+        data = rho_lab, ggplot2::aes(-Inf, Inf, label = .data$label),
+        vjust = 2, hjust = -0.25, size = base_size / 2.845276,
+        inherit.aes = FALSE
+      )
+    }
+
+    return(
+      p +
         ggplot2::labs(
           y = if (!is.na(unit)) paste0("Index value (", unit, ")") else "Index value",
-          x = "Year", col = "Cutoff", fill = "Cutoff"
+          x = "Year", col = cutoff_label, fill = cutoff_label
         ) +
         ggplot2::expand_limits(y = 0) +
-        ggplot2::coord_cartesian(expand = FALSE) +
         ggplot2::scale_y_continuous(n.breaks = 6) +
-        ggplot2::scale_x_continuous(breaks = scales::pretty_breaks(n = 10)) +
         ggplot2::theme_classic(base_size = base_size) +
+        .index_axis_layers() +
         ggplot2::theme(legend.position = "bottom")
     )
   }

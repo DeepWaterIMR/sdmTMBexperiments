@@ -37,7 +37,7 @@
 #'
 #' @importFrom rlang .data
 #' @examples
-#' \dontrun{
+#' \donttest{
 #' mesh <- sdmTMB::make_mesh(sdmTMB::pcod, c("X", "Y"), cutoff = 20)
 #' m1 <- sdmTMB::sdmTMB(
 #'   data = sdmTMB::pcod, formula = density ~ 0 + as.factor(year),
@@ -88,8 +88,14 @@ compare_models <- function(
     stop("`newdata` must be provided for predictions.")
   }
 
-  if (is.null(object_crs) && !is.null(models[[1]]$spde$mesh$crs)) {
-    object_crs <- sf::st_crs(models[[1]]$spde$mesh$crs)
+  if (is.null(object_crs)) {
+    mesh_crs <- models[[1]]$spde$mesh$crs
+    # make_mesh() has no `crs` argument, so a mesh built the usual way
+    # carries an NA (not NULL) crs; catch both, otherwise this silently
+    # passes an NA CRS through to the spatial plot (see compare_surveys()).
+    if (!is.null(mesh_crs) && !is.na(sf::st_crs(mesh_crs))) {
+      object_crs <- sf::st_crs(mesh_crs)
+    }
   }
 
   old_plan <- .setup_parallel(n_workers)
@@ -175,14 +181,43 @@ compare_models <- function(
 #' indices (`type = "index"`) or spatial maps of prediction differences
 #' (`type = "spatial"`, rendered on a [ggOceanMaps::basemap()]).
 #'
+#' @details
+#' For `type = "spatial"`, each grid cell is compared between a fitted model
+#' and the reference model for every year they share, on the response scale
+#' (i.e. `predict(..., type = "response")`, e.g. density rather than log
+#' density): `diff = est - ref_est` and `pr_diff = 100 * diff / ref_est`
+#' (percent). `spatial_response` selects how these per-year values are
+#' summarised across years into the single value mapped for each cell:
+#' * `"mean"`: `mean(diff)` — the average absolute difference, in response
+#'   units. Useful for the raw magnitude of disagreement, but not comparable
+#'   across cells with very different baseline abundance.
+#' * `"pr_mean"`: `mean(pr_diff)` — the average of the yearly percent
+#'   differences. Because each year is divided by that year's own (possibly
+#'   small) reference value, a handful of low-abundance years/cells can
+#'   dominate this average with large percentage swings even when the
+#'   absolute difference is small.
+#' * `"mean_pr_diff"` (default): `100 * mean(diff) / mean(ref_est)` — the
+#'   percent difference between the across-year mean predictions (a ratio of
+#'   means, not a mean of ratios). This is usually the more robust
+#'   percent-based summary, since a cell's overall multi-year baseline is used
+#'   in the denominator instead of each individual year's value.
+#'
 #' @param x An object of class `sdmTMB_model_comparison`.
 #' @param type Character. `"index"` (default) or `"spatial"`.
 #' @param index_divisor Optional numeric divisor applied to index values.
 #' @param unit Character. Unit label for axes. If `NA`, `"Index value"` is used.
+#' @param mohn Logical. Annotate the index plot with Mohn's rho (via
+#'   [mohns_rho()])? Default `FALSE`. Only applies when `type = "index"`.
 #' @param viridis Logical. Use the viridis palette for model groups? Default
 #'   `FALSE` (a fixed colour vector).
 #' @param spatial_response Character. Column mapped in spatial plots: one of
-#'   `"mean"`, `"pr_mean"` or `"mean_pr_diff"`. Default `"pr_mean"`.
+#'   `"mean"`, `"pr_mean"` or `"mean_pr_diff"`. Default `"mean_pr_diff"`. See
+#'   Details.
+#' @param fill_prefix Character. Prefix for the spatial-plot fill legend title
+#'   (`type = "spatial"`), e.g. `"Biomass density"` or `"CPUE"`. If `NULL`
+#'   (default), the legend title is `"Percent anomaly"`; otherwise
+#'   `paste(fill_prefix, "percent anomaly", sep = "\n")`. Models don't
+#'   necessarily share a response variable, so this isn't inferred automatically.
 #' @param transform_color_scale Logical. Apply a signed square-root colour scale
 #'   for spatial plots? Default `TRUE`.
 #' @param limit_rounding,break_rounding Numeric rounding for map fill limits and
@@ -197,6 +232,22 @@ compare_models <- function(
 #' @seealso [compare_models()]
 #' @import ggplot2
 #' @importFrom rlang .data
+#' @examples
+#' \donttest{
+#' mesh <- sdmTMB::make_mesh(sdmTMB::pcod, c("X", "Y"), cutoff = 20)
+#' m1 <- sdmTMB::sdmTMB(
+#'   data = sdmTMB::pcod, formula = density ~ 0 + as.factor(year),
+#'   time = "year", mesh = mesh, family = sdmTMB::tweedie(link = "log")
+#' )
+#' m2 <- sdmTMB::sdmTMB(
+#'   data = sdmTMB::pcod, formula = density ~ 0 + as.factor(year) + depth_scaled,
+#'   time = "year", mesh = mesh, family = sdmTMB::tweedie(link = "log")
+#' )
+#' nd <- sdmTMB::replicate_df(sdmTMB::qcs_grid, "year", unique(sdmTMB::pcod$year))
+#' x <- compare_models(m1, m2, newdata = nd, object_crs = 32609)
+#' plot(x, mohn = TRUE)
+#' plot(x, type = "spatial", fill_prefix = "Biomass density")
+#' }
 #' @method plot sdmTMB_model_comparison
 #' @export
 plot.sdmTMB_model_comparison <- function(
@@ -204,8 +255,10 @@ plot.sdmTMB_model_comparison <- function(
   type = "index",
   index_divisor = NULL,
   unit = NA,
+  mohn = FALSE,
   viridis = FALSE,
-  spatial_response = "pr_mean",
+  spatial_response = "mean_pr_diff",
+  fill_prefix = NULL,
   transform_color_scale = TRUE,
   limit_rounding = 10,
   break_rounding = 5,
@@ -221,10 +274,6 @@ plot.sdmTMB_model_comparison <- function(
       )
     }
 
-    rho <- mohns_rho(dat, group_col = "model",
-                     reference = attributes(x)$reference_model)
-    rho_lab <- data.frame(label = paste("Mohn's rho = ", round(rho, 3)))
-
     n_other <- length(unique(dat$model)) - 1
     index_colors <- if (viridis) {
       c("black", viridis::viridis(n_other))
@@ -232,8 +281,7 @@ plot.sdmTMB_model_comparison <- function(
       c("black", .index_color_vector[seq_len(n_other)])
     }
 
-    return(
-      ggplot2::ggplot(
+    p <- ggplot2::ggplot(
         dat,
         ggplot2::aes(
           x = .data$year, y = .data$est, ymin = .data$lwr, ymax = .data$upr,
@@ -245,35 +293,57 @@ plot.sdmTMB_model_comparison <- function(
         ggplot2::scale_color_manual(values = index_colors) +
         ggplot2::scale_fill_manual(
           values = dplyr::recode(index_colors, "black" = "grey")
-        ) +
-        ggplot2::geom_text(
-          data = rho_lab, ggplot2::aes(-Inf, Inf, label = .data$label),
-          vjust = 2, hjust = -0.25, size = base_size / 2.845276,
-          inherit.aes = FALSE
-        ) +
+        )
+
+    if (isTRUE(mohn)) {
+      rho <- mohns_rho(dat, group_col = "model",
+                       reference = attributes(x)$reference_model)
+      rho_lab <- data.frame(label = paste("Mohn's rho = ", round(rho, 3)))
+      p <- p + ggplot2::geom_text(
+        data = rho_lab, ggplot2::aes(-Inf, Inf, label = .data$label),
+        vjust = 2, hjust = -0.25, size = base_size / 2.845276,
+        inherit.aes = FALSE
+      )
+    }
+
+    return(
+      p +
         ggplot2::labs(
           y = if (!is.na(unit)) paste0("Index value (", unit, ")") else "Index value",
           x = "Year", col = "Model", fill = "Model"
         ) +
         ggplot2::expand_limits(y = 0) +
-        ggplot2::coord_cartesian(expand = FALSE) +
         ggplot2::scale_y_continuous(n.breaks = 6) +
-        ggplot2::scale_x_continuous(breaks = scales::pretty_breaks(n = 10)) +
         ggplot2::theme_classic(base_size = base_size) +
+        .index_axis_layers() +
         ggplot2::theme(legend.position = "bottom")
     )
   }
 
   if (type == "spatial") {
+    # The bare "Percent anomaly" (no "Biomass density" prefix) default only
+    # applies to percent-based responses; a "mean" (absolute) response keeps
+    # .spatial_diff_map()'s own label so it isn't mislabelled as a percent.
+    is_pct_response <- spatial_response %in% .pct_spatial_responses
     return(cowplot::plot_grid(
       plotlist = lapply(seq_along(x$grid), function(i) {
-        .spatial_diff_map(
+        p <- .spatial_diff_map(
           grid = x$grid[[i]], crs = attributes(x)$crs,
           spatial_response = spatial_response, unit = unit,
           transform_color_scale = transform_color_scale,
           limit_rounding = limit_rounding, break_rounding = break_rounding,
-          base_size = base_size, title = names(x$grid)[i]
+          base_size = base_size, title = names(x$grid)[i],
+          fill_prefix = fill_prefix
         )
+        if (is_pct_response) {
+          fill_lab <- if (is.null(fill_prefix)) {
+            "Percent anomaly"
+          } else {
+            paste(fill_prefix, "percent anomaly", sep = "\n")
+          }
+          p <- p + ggplot2::labs(fill = fill_lab)
+        }
+        p
       })
     ))
   }

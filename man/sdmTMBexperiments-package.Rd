@@ -6,7 +6,7 @@
 \alias{sdmTMBexperiments-package}
 \title{sdmTMBexperiments: Experimental Helper Functions for 'sdmTMB'}
 \description{
-A collection of experimental helper functions for working with fitted spatiotemporal models from the 'sdmTMB' package: model comparison, mesh sensitivity analysis, retrospective analysis, survey-specific index comparison, prediction-grid construction, and diagnostic plotting. The package doubles as a showcase of how to use these functions and a staging ground for methods that may later be adopted into 'sdmTMB'.
+A collection of experimental helper functions for working with spatiotemporal models from the 'sdmTMB' package: model comparison, mesh sensitivity analysis, retrospective analysis, survey-specific index comparison, prediction-grid construction, and diagnostic plotting. The package doubles as a showcase of how to use these functions and a staging ground for methods that may later be adopted into 'sdmTMB'.
 }
 \seealso{
 Useful links:

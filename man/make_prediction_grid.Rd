@@ -10,7 +10,8 @@ make_prediction_grid(
   crs = NULL,
   coord_multiplier = 1000,
   max_depth = NULL,
-  depth_fun = NULL
+  depth_fun = NULL,
+  bathy_style = "raster_continuous"
 )
 }
 \arguments{
@@ -27,15 +28,28 @@ CRS units.}
 \item{coord_multiplier}{Numeric factor to convert model units to CRS units.
 Default \code{1000}.}
 
-\item{max_depth}{Optional numeric. If supplied together with \code{depth_fun},
-grid cells with depth outside \code{c(1, max_depth)} are dropped.}
+\item{max_depth}{Optional numeric. If supplied, grid cells with depth
+outside \code{c(1, max_depth)} are dropped. Turns on depth extraction (see
+\code{depth_fun}/\code{bathy_style}).}
 
-\item{depth_fun}{Optional function taking an \code{sf} points object and returning
-a numeric vector of (positive) depths. Only used when \code{max_depth} is set.}
+\item{depth_fun}{Optional function taking an \code{sf} points object and
+returning a numeric vector of (positive) depths. Only used when
+\code{max_depth} is set. If \code{NULL} (default) while \code{max_depth} is set, depth is
+extracted automatically via \code{\link[ggOceanMaps:get_depth]{ggOceanMaps::get_depth()}} using \code{bathy_style}
+— supply your own \code{depth_fun} to use a different bathymetry source (e.g. a
+specific GEBCO file via \code{bathy.style = "raster_user"} and
+\code{options(ggOceanMaps.userpath = ...)}, or a local raster/interpolation).}
+
+\item{bathy_style}{Character. \code{bathy.style} passed to
+\code{\link[ggOceanMaps:get_depth]{ggOceanMaps::get_depth()}} when \code{depth_fun} is \code{NULL}. Default
+\code{"raster_continuous"} (ETOPO, bundled with ggOceanMaps — no extra
+download path needed). Ignored when \code{depth_fun} is supplied.}
 }
 \value{
-A data frame with columns \code{X}, \code{Y} (in model units) and, when depth
-filtering is applied, a \code{depth} column.
+A data frame (class \code{sdmTMB_prediction_grid}, so
+\code{\link[=plot.sdmTMB_prediction_grid]{plot.sdmTMB_prediction_grid()}} can be used on it directly) with columns
+\code{X}, \code{Y} (in model units) and, when depth filtering is applied, a \code{depth}
+column. Carries \code{crs}, \code{coord_multiplier} and \code{resolution} attributes.
 }
 \description{
 Creates a regular grid of centre points covering an \code{sf} \code{region}, at a given
@@ -45,13 +59,20 @@ the model (divided by \code{coord_multiplier}).
 }
 \examples{
 \donttest{
-d <- data.frame(X = runif(50, 0, 100), Y = runif(50, 0, 100))
-region <- make_survey_prediction_region(d, crs = 32633)
-grid <- make_prediction_grid(region, resolution = 10)
+data(sebastes)
+eggan <- subset(sebastes, cruiseseries == "EggaN")
+region <- make_survey_prediction_region(eggan, crs = 32633, concavity = 5)
+
+# max_depth turns on depth extraction, via ggOceanMaps::get_depth() by
+# default (bathy_style controls the bathymetry source); cells outside
+# c(1, max_depth) are dropped. plot() then colours by depth automatically.
+grid <- make_prediction_grid(region, resolution = 20, max_depth = 1000)
+range(grid$depth)
+plot(grid)
 }
 }
 \seealso{
-\code{\link[=make_survey_prediction_region]{make_survey_prediction_region()}}
+\code{\link[=make_survey_prediction_region]{make_survey_prediction_region()}}, \code{\link[=plot.sdmTMB_prediction_grid]{plot.sdmTMB_prediction_grid()}}
 }
 \author{
 Mikko Vihtakari

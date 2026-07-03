@@ -76,51 +76,65 @@ bubble_map <- function(
   )))
   color_breaks <- color_breaks[color_breaks <= (max_val + 1)]
 
+  # guide = "bins" here must match scale_size_binned()'s guide below, or
+  # ggplot2 can't merge the fill/colour and size scales into one legend.
   pos_scale <- if (filled_circles) {
     ggplot2::binned_scale(
       aesthetics = "fill",
       palette = function(z) viridis::turbo(length(color_breaks) - 1),
-      limits = c(0, max_val + 1), breaks = color_breaks, show.limits = TRUE
+      limits = c(0, max_val + 1), breaks = color_breaks, show.limits = TRUE,
+      guide = "bins"
     )
   } else {
     ggplot2::binned_scale(
       aesthetics = "colour",
       palette = function(z) viridis::turbo(length(color_breaks) - 1),
-      limits = c(0, max_val + 1), breaks = color_breaks, show.limits = TRUE
+      limits = c(0, max_val + 1), breaks = color_breaks, show.limits = TRUE,
+      guide = "bins"
     )
   }
 
   pos <- x[x$value > 0, ]
   pos <- pos[order(-pos$value), ]
 
+  # `shape` is constant within each of `pos` (always > 0) and the zero-value
+  # layer below (always == 0), so it's set as a fixed value per layer, not
+  # mapped via aes(): a mapped-but-guide-suppressed shape aesthetic breaks
+  # ggplot2's merging of the fill/colour and size legends into one.
   pos_layer <- if (filled_circles) {
     ggspatial::geom_spatial_point(
       data = pos,
       ggplot2::aes(x = .data$lon, y = .data$lat, size = .data$value,
-                   fill = .data$value, shape = .data$value == 0),
-      alpha = 0.4, crs = 4326, stroke = point_stroke
+                   fill = .data$value),
+      shape = 21, alpha = 0.4, crs = 4326, stroke = point_stroke
     )
   } else {
     ggspatial::geom_spatial_point(
       data = pos,
       ggplot2::aes(x = .data$lon, y = .data$lat, size = .data$value,
-                   colour = .data$value, shape = .data$value == 0),
-      alpha = 0.4, crs = 4326, stroke = point_stroke
+                   colour = .data$value),
+      shape = 21, alpha = 0.4, crs = 4326, stroke = point_stroke
     )
   }
 
   p <- ggOceanMaps::basemap(x, base_size = base_size, expand.factor = 1.05) +
     ggspatial::geom_spatial_point(
       data = x[x$value == 0, ],
-      ggplot2::aes(x = .data$lon, y = .data$lat, shape = .data$value == 0),
-      color = zero_color, size = 1, crs = 4326, stroke = 2 * point_stroke
+      ggplot2::aes(x = .data$lon, y = .data$lat),
+      shape = 3, color = zero_color, size = 1, crs = 4326,
+      stroke = 2 * point_stroke
     ) +
     pos_layer +
-    ggplot2::labs(fill = label, color = label, size = label) +
-    ggplot2::scale_shape_manual(values = c(`TRUE` = 3, `FALSE` = 21),
-                                guide = "none") +
-    ggplot2::scale_size(breaks = color_breaks, limits = c(0, max_val + 1),
-                        range = c(1, 14)) +
+    ggplot2::labs(
+      fill = if (filled_circles) label else NULL,
+      color = if (!filled_circles) label else NULL,
+      size = label
+    ) +
+    # scale_size_binned() (not the continuous scale_size()) so its legend
+    # keys match pos_scale's binned fill/colour keys and ggplot merges them
+    # into one combined size+colour legend instead of two separate ones.
+    ggplot2::scale_size_binned(breaks = color_breaks, limits = c(0, max_val + 1),
+                               range = c(1, 14), guide = "bins") +
     pos_scale +
     ggplot2::theme(legend.position = "bottom")
 

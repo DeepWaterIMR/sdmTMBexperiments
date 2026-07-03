@@ -21,6 +21,20 @@ A \code{ggplot} object.
 Computes randomized quantile residuals for each family component of a fitted
 sdmTMB model and draws a Q-Q plot. Delta models are faceted by component.
 }
+\examples{
+\donttest{
+mesh <- sdmTMB::make_mesh(sdmTMB::pcod, c("X", "Y"), cutoff = 20)
+m1 <- sdmTMB::sdmTMB(
+  density ~ 0 + as.factor(year),
+  data = sdmTMB::pcod,
+  time = "year",
+  mesh = mesh,
+  family = sdmTMB::delta_lognormal()
+)
+# Automatically plots all components of the delta model
+plot_residual_qq(m1)
+}
+}
 \seealso{
 \code{\link[stats:residuals]{stats::residuals()}}, \code{sdmTMB::residuals.sdmTMB()}
 }

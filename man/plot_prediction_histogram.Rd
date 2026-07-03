@@ -32,6 +32,18 @@ Compares the distribution of the observed response with the distribution of
 predicted values over the prediction grid, on a \code{log1p} x-axis, with the means
 marked. Blue lines indicate mean values.
 }
+\examples{
+\donttest{
+mesh <- sdmTMB::make_mesh(sdmTMB::pcod, c("X", "Y"), cutoff = 20)
+m <- sdmTMB::sdmTMB(
+  density ~ 0 + as.factor(year), data = sdmTMB::pcod, time = "year",
+  mesh = mesh, family = sdmTMB::tweedie()
+)
+nd <- sdmTMB::replicate_df(sdmTMB::qcs_grid, "year", unique(sdmTMB::pcod$year))
+pred <- predict(m, newdata = nd, type = "response")
+plot_prediction_histogram(m, pred)
+}
+}
 \author{
 Mikko Vihtakari
 }

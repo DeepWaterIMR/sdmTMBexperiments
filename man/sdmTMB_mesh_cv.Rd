@@ -54,10 +54,13 @@ inherited from \code{object}.}
 }
 \value{
 A data frame (tibble) of class \code{sdmTMB_mesh_cv} with one row per
-cutoff: \code{cutoff}, \code{crashed}, \code{converged}, \code{sanity}, \code{sum_loglik},
-\code{mean_aic}, and the derived \code{deltaNLL}, \code{deltaNLL_pr}, \code{deltaAIC},
-\code{deltaAIC_pr}. The list of \code{\link[sdmTMB:sdmTMB_cv]{sdmTMB::sdmTMB_cv()}} objects is attached as the
-\code{"cv"} attribute.
+cutoff: \code{cutoff}, \code{crashed}, \code{converged}, \code{sanity}, \code{sum_loglik} (the
+summed hold-out log-likelihood from \code{\link[sdmTMB:sdmTMB_cv]{sdmTMB::sdmTMB_cv()}}; higher is
+better), \code{mean_aic}, and the derived \code{deltaNLL}, \code{deltaNLL_pr},
+\code{deltaAIC}, \code{deltaAIC_pr}. \code{deltaNLL}/\code{deltaAIC} are relative to the
+best-fitting cutoff (\code{0} = best; lower is better, mirroring AIC). The
+list of \code{\link[sdmTMB:sdmTMB_cv]{sdmTMB::sdmTMB_cv()}} objects is attached as the \code{"cv"}
+attribute.
 }
 \description{
 Compares alternative mesh resolutions for an sdmTMB model using spatial
@@ -72,9 +75,14 @@ settings are inherited from the fitted \code{object}, and nothing about the data
 is assumed beyond the coordinate and response columns.
 }
 \examples{
-\dontrun{
+\donttest{
 # Requires the 'blockCV' package.
-cv <- sdmTMB_mesh_cv(fit, mesh_cutoffs = c(50, 70, 100), k = 3)
+mesh <- sdmTMB::make_mesh(sdmTMB::pcod, c("X", "Y"), cutoff = 20)
+fit <- sdmTMB::sdmTMB(
+  data = sdmTMB::pcod, formula = density ~ 0 + as.factor(year),
+  time = "year", mesh = mesh, family = sdmTMB::tweedie(link = "log")
+)
+cv <- sdmTMB_mesh_cv(fit, mesh_cutoffs = c(15, 30), k = 3)
 cv
 plot(cv)
 }

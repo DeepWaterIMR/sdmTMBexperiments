@@ -43,8 +43,10 @@ the full model domain.
 }
 \examples{
 \donttest{
-d <- data.frame(X = runif(50, 0, 100), Y = runif(50, 0, 100))
-region <- make_survey_prediction_region(d, crs = 32633)
+data(sebastes)
+eggan <- subset(sebastes, cruiseseries == "EggaN")
+region <- make_survey_prediction_region(eggan, crs = 32633, concavity = 5)
+ggOceanMaps::qmap(region, fill = I(NA))
 }
 }
 \seealso{

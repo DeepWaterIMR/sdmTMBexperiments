@@ -20,6 +20,16 @@ intervals from \code{\link[sdmTMB:tidy]{sdmTMB::tidy()}}. This is the generic eq
 conditional-effects figure: it summarises the fitted parameters rather than
 predicting over covariate ranges.
 }
+\examples{
+\donttest{
+mesh <- sdmTMB::make_mesh(sdmTMB::pcod, c("X", "Y"), cutoff = 20)
+m <- sdmTMB::sdmTMB(
+  density ~ 0 + as.factor(year) + depth_scaled, data = sdmTMB::pcod,
+  time = "year", mesh = mesh, family = sdmTMB::tweedie()
+)
+plot_fixed_effects(m)
+}
+}
 \seealso{
 \code{\link[sdmTMB:tidy]{sdmTMB::tidy()}}
 }

@@ -94,8 +94,16 @@
 #' @return A data frame with the index and a `cv` column.
 #' @keywords internal
 #' @noRd
-.safe_index <- function(mod, newdata, time_col, nsplit, bias_correct, level,
-                        area, silent) {
+.safe_index <- function(
+  mod,
+  newdata,
+  time_col,
+  nsplit,
+  bias_correct,
+  level,
+  area,
+  silent
+) {
   if (is.null(mod) || inherits(mod, "try-error")) {
     return(.crashed_index(unique(newdata[[time_col]])))
   }
@@ -114,17 +122,24 @@
   idx
 }
 
-#' Per-grid-cell prediction difference between a model and a reference model
+#' Per-grid-cell, per-year prediction difference between a model and a
+#' reference model
 #'
-#' Predicts both models onto the years shared with `mod`, and returns a data
-#' frame with the response predictions, their difference, and a per-cell percent
-#' difference. A `depth` column is carried through when present in `newdata`.
+#' Predicts both models onto the years shared with `mod`, on the response
+#' scale (`type = "response"`, e.g. density rather than log density), and
+#' returns one row per grid cell per year with the response predictions,
+#' their absolute difference and a percent difference. Callers group this by
+#' cell (and add a `mean_pr_diff` column) to summarise across years for a
+#' spatial map — see the `spatial_response` argument documented in
+#' `plot.sdmTMB_model_comparison()` for the exact formulas and the tradeoffs
+#' between `pr_diff`-based and `mean_pr_diff`-based summaries. A `depth`
+#' column is carried through when present in `newdata`.
 #'
 #' @param mod,ref_mod Fitted sdmTMB models.
 #' @param newdata Prediction grid data frame with `X`, `Y` and `time_col`.
 #' @param time_col Name of the time column.
 #' @return A data frame with `year`, `X`, `Y`, (`depth`), `est`, `ref_est`,
-#'   `diff`, `pr_diff`.
+#'   `diff` (`est - ref_est`), `pr_diff` (`100 * diff / ref_est`).
 #' @keywords internal
 #' @noRd
 .pred_diff_base <- function(mod, ref_mod, newdata, time_col) {
@@ -132,8 +147,17 @@
     newdata,
     .data[[time_col]] %in% unique(mod$data[[time_col]])
   )
-  pred <- stats::predict(mod, newdata = nd, type = "response", model = NA)
-  pred_ref <- stats::predict(ref_mod, newdata = nd, type = "response", model = NA)
+  # newdata has no offset column by design (grid cells aren't real hauls; we
+  # want density predictions and area-weight them separately), so a fitted
+  # model with an offset makes predict() emit an expected/benign cli_inform()
+  # ("...assuming the offset vector is 0...") that would otherwise surface on
+  # every call here.
+  pred <- suppressMessages(
+    stats::predict(mod, newdata = nd, type = "response", model = NA)
+  )
+  pred_ref <- suppressMessages(
+    stats::predict(ref_mod, newdata = nd, type = "response", model = NA)
+  )
 
   out <- data.frame(
     year = nd[[time_col]],
@@ -144,7 +168,9 @@
     diff = pred$est - pred_ref$est,
     pr_diff = 100 * (pred$est - pred_ref$est) / pred_ref$est
   )
-  if ("depth" %in% names(nd)) out$depth <- nd$depth
+  if ("depth" %in% names(nd)) {
+    out$depth <- nd$depth
+  }
   out
 }
 
@@ -174,6 +200,52 @@
   }
 }
 
+#' Whole-year-friendly axis breaks
+#'
+#' Wraps [scales::pretty_breaks()], but when the axis range itself is whole
+#' numbers (the usual case for a `year` column) it searches for the largest
+#' `n_try <= n` whose `pretty()` breaks are all whole numbers, so years are
+#' shown as `2020`, not `2020.0`/`2020.5`. Ranges that aren't whole numbers
+#' (a model using fractional years) fall back to the regular extended-breaks
+#' algorithm.
+#'
+#' @param n Target number of breaks.
+#' @keywords internal
+#' @noRd
+.year_breaks <- function(n = 10) {
+  function(x) {
+    if (!all(x == round(x), na.rm = TRUE)) {
+      return(scales::extended_breaks(n = n)(x))
+    }
+    for (n_try in seq(n, 2)) {
+      b <- pretty(x, n_try)
+      if (all(b == round(b))) return(b)
+    }
+    round(pretty(x, 2))
+  }
+}
+
+#' Shared x-axis/margin layers for yearly index plots
+#'
+#' Every index plot (`plot_index()` and the `type = "index"` methods of the
+#' three comparison functions and `plot.sdmTMB_retro()`) uses
+#' `coord_cartesian(expand = FALSE)` so the ribbon/path reach the panel edges.
+#' That puts the last year's axis break exactly on the panel border, so its
+#' tick label is only half covered by the axis strip and gets clipped by the
+#' plot's outer margin unless that margin leaves it room.
+#'
+#' @return A list of ggplot2 layers: `coord_cartesian()`, `scale_x_continuous()`
+#'   and a `theme()` with a wider right/top plot margin.
+#' @keywords internal
+#' @noRd
+.index_axis_layers <- function() {
+  list(
+    ggplot2::coord_cartesian(expand = FALSE, clip = "off"),
+    ggplot2::scale_x_continuous(breaks = .year_breaks(10)),
+    ggplot2::theme(plot.margin = ggplot2::margin(t = 11, r = 20, b = 5.5, l = 5.5))
+  )
+}
+
 ## Shared negative-square-root transformation used by the spatial map plots ----
 
 #' A signed square-root scales transformation
@@ -191,17 +263,83 @@
   )
 }
 
+#' Break points for a diverging (percent-anomaly) fill scale
+#'
+#' Always includes `limits` (so the map's actual range is legible) and `0`
+#' (when `limits` spans it, since that's the "no change" reference for a
+#' diverging scale), then fills in additional breaks -- evenly spaced in the
+#' same signed-square-root space the colour scale itself uses -- up to `n`
+#' total, skipping any candidate that would sit too close to an
+#' already-chosen break. Without this de-crowding step, skewed/extreme ranges
+#' produced breaks so close together after rounding that their labels
+#' overlapped into illegible text.
+#'
+#' @param limits Numeric length-2 vector, the scale's `c(min, max)`.
+#' @param rounding Numeric. Round breaks to a multiple of this.
+#' @param n Integer. Target number of breaks (including limits/zero).
+#' @keywords internal
+#' @noRd
+.diverging_breaks <- function(limits, rounding = 5, n = 6) {
+  trans <- function(x) sign(x) * sqrt(abs(x))
+  inv <- function(x) sign(x) * x^2
+
+  span <- trans(limits[2]) - trans(limits[1])
+  if (!is.finite(span) || span <= 0) return(limits)
+
+  min_gap <- span / n
+
+  # limits (and 0, when spanned) are kept exact; only interior candidates are
+  # rounded, so the mandatory breaks are never nudged off their true value.
+  kept_val <- limits
+  kept_t <- trans(limits)
+  if (limits[1] < 0 && limits[2] > 0) {
+    kept_val <- c(kept_val, 0)
+    kept_t <- c(kept_t, 0)
+  }
+
+  cand_t <- seq(trans(limits[1]), trans(limits[2]), length.out = 4 * n)
+  cand_val <- round(inv(cand_t) / rounding) * rounding
+  cand_t <- trans(cand_val)
+
+  for (i in order(cand_t)) {
+    if (length(kept_t) >= n) break
+    if (all(abs(cand_t[i] - kept_t) >= min_gap)) {
+      kept_t <- c(kept_t, cand_t[i])
+      kept_val <- c(kept_val, cand_val[i])
+    }
+  }
+
+  unique(kept_val[order(kept_t)])
+}
+
+# spatial_response values that are percentages (vs. absolute response-unit
+# differences), shared between .spatial_diff_map()'s own fill-label logic and
+# the comparison plot() methods that build a fill_prefix on top of it.
+.pct_spatial_responses <- c(
+  "pr_anomaly", "total_pr_anomaly", "max_pr_anomaly", "pr_mean", "mean_pr_diff"
+)
+
 # Standard color vector for grouped index series (reference is drawn in black)
 .index_color_vector <- c(
-  "#D696C8", "#449BCF", "#82C893", "#FF5F68",
-  "#FF9252", "#FFC95B", "#056A89"
+  "#D696C8",
+  "#449BCF",
+  "#82C893",
+  "#FF5F68",
+  "#FF9252",
+  "#FFC95B",
+  "#056A89"
 )
 
 #' Build one spatial prediction-difference map on a ggOceanMaps basemap
 #'
 #' Shared by the `plot()` methods of the model, mesh and survey comparisons.
-#' Aggregates a per-cell/per-year difference grid over years, converts it to
-#' `sf`, and draws it on [ggOceanMaps::basemap()].
+#' Aggregates a per-cell/per-year difference grid (see `.pred_diff_base()`)
+#' over years, converts it to `sf`, and draws it on [ggOceanMaps::basemap()].
+#' `mean = mean(diff)`, `pr_mean = mean(pr_diff)`, and `mean_pr_diff` is
+#' carried through unchanged (it is already one constant value per cell,
+#' computed by the caller as `100 * mean(diff) / mean(ref_est)`). See the
+#' `spatial_response` argument documented in `plot.sdmTMB_model_comparison()`
+#' for what these mean and when to prefer one over another.
 #'
 #' @param grid A data frame with columns `X`, `Y`, `diff`, `pr_diff` and
 #'   optionally `mean_pr_diff`.
@@ -214,53 +352,82 @@
 #' @param limit_rounding,break_rounding Rounding for fill limits and breaks.
 #' @param base_size Base font size.
 #' @param title Panel title.
+#' @param fill_prefix Optional prefix for the fill legend title, replacing the
+#'   default "Biomass density". `NULL` (default) keeps that default.
 #' @keywords internal
 #' @noRd
-.spatial_diff_map <- function(grid, crs, spatial_response = "pr_mean",
-                              unit = NA, transform_color_scale = TRUE,
-                              limit_rounding = 10, break_rounding = 5,
-                              base_size = 11, title = NULL) {
+.spatial_diff_map <- function(
+  grid,
+  crs,
+  spatial_response = "pr_mean",
+  unit = NA,
+  transform_color_scale = TRUE,
+  limit_rounding = 10,
+  break_rounding = 5,
+  base_size = 11,
+  title = NULL,
+  fill_prefix = NULL
+) {
   has_mpd <- "mean_pr_diff" %in% names(grid)
   agg <- grid |>
     dplyr::group_by(.data$X, .data$Y) |>
     dplyr::reframe(
       mean = mean(.data$diff, na.rm = TRUE),
       pr_mean = mean(.data$pr_diff, na.rm = TRUE),
-      mean_pr_diff = if (has_mpd) mean(.data$mean_pr_diff, na.rm = TRUE) else NA_real_
+      mean_pr_diff = if (has_mpd) {
+        mean(.data$mean_pr_diff, na.rm = TRUE)
+      } else {
+        NA_real_
+      }
     ) |>
     dplyr::mutate(X = 1000 * .data$X, Y = 1000 * .data$Y) |>
     sf::st_as_sf(
-      coords = c("X", "Y"), crs = suppressWarnings(crs), remove = FALSE
+      coords = c("X", "Y"),
+      crs = suppressWarnings(crs),
+      remove = FALSE
     )
 
   vals <- agg[[spatial_response]]
   limits <- c(
-    floor(stats::quantile(vals, 0, na.rm = TRUE) / limit_rounding) * limit_rounding,
-    ceiling(stats::quantile(vals, 1, na.rm = TRUE) / limit_rounding) * limit_rounding
+    floor(stats::quantile(vals, 0, na.rm = TRUE) / limit_rounding) *
+      limit_rounding,
+    ceiling(stats::quantile(vals, 1, na.rm = TRUE) / limit_rounding) *
+      limit_rounding
   )
-  breaks <- seq(sign(limits[1]) * sqrt(abs(limits[1])), sqrt(limits[2]),
-                length.out = 6)
-  breaks <- round(sign(breaks) * breaks^2 / break_rounding) * break_rounding
+  breaks <- .diverging_breaks(limits, rounding = break_rounding, n = 4)
+
+  # Abbreviated labels (e.g. "-9.2M" instead of "-9232700"): break *values*
+  # are already de-crowded above, but long, wide labels can still visually
+  # collide on a legend of fixed width, especially for extreme/skewed ranges.
+  break_labels <- scales::label_number(scale_cut = scales::cut_short_scale())
 
   fill_scale <- if (transform_color_scale) {
     ggplot2::scale_fill_gradient2(
-      trans = .negsqrt_trans(), breaks = breaks, midpoint = 0, limits = limits
+      trans = .negsqrt_trans(),
+      breaks = breaks,
+      labels = break_labels,
+      midpoint = 0,
+      limits = limits
     )
   } else {
-    ggplot2::scale_fill_gradient2(midpoint = 0)
+    ggplot2::scale_fill_gradient2(midpoint = 0, labels = break_labels)
   }
 
-  fill_lab <- if (spatial_response %in% c(
-    "pr_anomaly", "total_pr_anomaly", "max_pr_anomaly", "pr_mean", "mean_pr_diff"
-  )) {
-    "Biomass density\npercent anomaly"
-  } else if (is.na(unit)) {
-    expression(atop(Biomass ~ density, anomaly))
+  fill_lab <- if (spatial_response %in% .pct_spatial_responses) {
+    if (is.null(fill_prefix)) {
+      "Biomass density\npercent anomaly"
+    } else {
+      paste(fill_prefix, "percent anomaly", sep = "\n")
+    }
   } else {
-    bquote(atop(
-      Biomass ~ density,
-      paste("anomaly (", .(unit), " ", nmi^{-2}, ")")
-    ))
+    prefix <- if (is.null(fill_prefix)) quote(Biomass ~ density) else fill_prefix
+    if (is.na(unit)) {
+      bquote(atop(.(prefix), anomaly))
+    } else {
+      bquote(atop(.(prefix), paste("anomaly (", .(unit), " ", nmi^{
+        -2
+      }, ")")))
+    }
   }
 
   ggOceanMaps::basemap(agg, crs = crs, base_size = base_size) +

@@ -110,6 +110,42 @@ grids are built from the spatial footprint of each survey using a concave
 hull (\code{\link[=make_survey_prediction_region]{make_survey_prediction_region()}}). The output can be plotted as a time
 series, a scatter plot, or a spatial prediction-difference map.
 }
+\examples{
+\donttest{
+data(sebastes)
+sub <- subset(sebastes, cruiseseries \%in\% c("EcoS", "WinterS") & year >= 2020)
+
+# A simple "compiled" full-domain model and index, used as the reference.
+# `biomass` (raw catch), not `density`, is the response here: `density` is
+# already swept_area-normalised, so using it together with the swept_area
+# offset below would double-correct for effort.
+compiled_mesh <- sdmTMB::make_mesh(sub, c("X", "Y"), cutoff = 50)
+compiled_model <- sdmTMB::sdmTMB(
+  biomass ~ 0 + as.factor(year), data = sub, time = "year",
+  mesh = compiled_mesh, family = sdmTMB::tweedie(), spatiotemporal = "off",
+  offset = log(sub$swept_area)
+)
+full_region <- make_survey_prediction_region(sub, crs = 32633, concavity = 5)
+full_grid <- sdmTMB::replicate_df(
+  make_prediction_grid(full_region, resolution = 20), "year", unique(sub$year)
+)
+# swept_area is in square nautical miles, so cell area must be too: convert
+# the 20 km grid resolution to nautical miles before squaring.
+cell_area <- (20 / 1.852)^2
+compiled_index <- sdmTMB::get_index_split(
+  compiled_model, newdata = full_grid, area = cell_area, nsplit = 3, silent = TRUE
+)
+
+sc <- compare_surveys(
+  data = sub, compiled_index = compiled_index, compiled_model = compiled_model,
+  surveys = c("EcoS", "WinterS"), newdata = full_grid, object_crs = 32633,
+  mesh_cutoff = 50, offset_col = "swept_area", area = cell_area
+)
+plot(sc)
+plot(sc, type = "scatter")
+plot(sc, type = "spatial", fill_prefix = "Biomass density")
+}
+}
 \seealso{
 \code{\link[=plot.sdmTMB_survey_comparison]{plot.sdmTMB_survey_comparison()}}, \code{\link[=compare_models]{compare_models()}},
 \code{\link[=make_survey_prediction_region]{make_survey_prediction_region()}}

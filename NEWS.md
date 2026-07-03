@@ -30,6 +30,138 @@ project-local helpers.
 - Validate `X`/`Y` columns in `compare_meshes()`.
 - Palette-safe colours in `plot.sdmTMB_mesh_comparison()` for any number of
   cutoffs.
-- `sdmTMB_retro()` reuses the original mesh unchanged when `refit_meshes = FALSE`
-  (no longer mutates `mesh$loc_xy`) and clamps `nyears` to the available years.
+- `sdmTMB_retro()` rebuilds the mesh's data mapping for each peel when
+  `refit_meshes = FALSE` (previously reusing the fitted `sdmTMBmesh` unchanged
+  meant every peel but the terminal one failed to converge and silently
+  returned `NA` index rows), and clamps `nyears` to the available years.
 - Use portable `future::multisession` parallelism (works on Windows).
+- `compare_surveys()` no longer silently inherits an `NA` CRS from
+  `compiled_model` when `object_crs` is left `NULL` (a normally built
+  `sdmTMB::make_mesh()` mesh has `crs = NA`, not `NULL`); it now errors with a
+  clear message asking for `object_crs` instead of failing deep inside
+  `plot(..., type = "spatial")`.
+- `plot_prediction_map()` no longer hardcodes a `limits = c(0, NA)` fill
+  scale, which silently rendered any out-of-range cell (e.g. negative
+  link-scale predictions) as blank/grey with no indication why. The scale
+  range is now taken from the data by default; a new `fill_limits` argument
+  (default `NULL`) lets you opt into an explicit floor/ceiling, and a warning
+  fires only if that explicit choice actually clips data.
+- `sdmTMB_mesh_cv()`'s `deltaNLL`/`deltaNLL_pr` had the wrong sign: they were
+  computed straight from `sum_loglik` (a log-likelihood, where higher is
+  better) without negating it, so despite the name they were a
+  delta-log-likelihood (`<= 0`, max = best) rather than a proper delta-NLL.
+  Now `>= 0` with `0` (min) indicating the best-fitting mesh cutoff,
+  consistent with `deltaAIC`.
+- The vignette's `compare_surveys()` example fit `density` as the response
+  while also passing a `swept_area` log-offset; since `density` is already
+  `biomass / swept_area`, this double-corrected for effort and, combined with
+  an `area` argument left in km² instead of `swept_area`'s square nautical
+  miles, inflated the resulting index by roughly 1000x. Fixed by fitting
+  `biomass` as the response and converting `area` to square nautical miles.
+- `.spatial_diff_map()`'s (the shared spatial-difference map used by all
+  three comparison `plot()` methods) fill-scale breaks could be crowded/
+  illegible for skewed or extreme ranges, and didn't guarantee the scale's
+  actual limits or `0` were shown. Breaks are now guaranteed to include the
+  limits and `0` (when spanned), de-crowded so adjacent breaks are never too
+  close together, and labelled with abbreviated numbers (e.g. `"-9.2K"`) via
+  `scales::label_number(scale_cut = scales::cut_short_scale())`.
+- `compare_models()`/`compare_surveys()`'s spatial `plot()` methods
+  unconditionally labelled the fill legend "Percent anomaly" even when
+  `spatial_response = "mean"` (an absolute density difference, not a
+  percent); `compare_meshes()` didn't have this bug. Fixed by only applying
+  the percent label when `spatial_response` is actually one of the
+  percent-based options.
+- The rightmost year's x-axis label was cropped in every index plot
+  (`plot_index()`, and the `type = "index"` `plot()` methods of the three
+  comparison functions and `sdmTMB_retro()`): `coord_cartesian(expand =
+  FALSE)` puts the last data point exactly on the panel edge, and the
+  default plot margin didn't leave room for its tick label. Fixed with a
+  shared, wider plot margin.
+- Those same index plots' x-axis could show decimal year breaks (`2020.0`,
+  `2020.5`, ...) for short year ranges, since `scales::pretty_breaks()` picks
+  sub-1 steps when that gives a better fit to the target break count. Whole
+  year ranges now always get whole-year breaks (falling back to the regular
+  algorithm only if the range itself isn't whole numbers).
+
+## Other changes
+
+- `plot.sdmTMB_model_comparison(type = "index")` gains a `mohn` argument
+  (default `FALSE`) controlling whether the Mohn's rho annotation is added;
+  previously it was always shown.
+- `plot.sdmTMB_model_comparison(type = "spatial")` gains a `fill_prefix`
+  argument for the fill legend title (e.g. `"Biomass density"`, `"CPUE"`).
+  Previously the legend was hardcoded to "Biomass density\npercent anomaly",
+  which doesn't hold for models with other response variables. Default `NULL`
+  now gives a generic "Percent anomaly" title.
+- `plot_prediction_map()`'s `trans` argument is renamed `transform` (default
+  `"identity"`, was `"sqrt"`), matching ggplot2's `continuous_scale()` API
+  (`trans` is deprecated there in favour of `transform`).
+- `plot.sdmTMB_mesh_comparison(type = "index")` gains the same `mohn`
+  argument (default `FALSE`) as `plot.sdmTMB_model_comparison()`, and a
+  `cutoff_label` argument (default `"Cutoff"`) for the colour/fill legend
+  title, e.g. `cutoff_label = "Cutoff (km)"`.
+- `compare_meshes()` now also computes `mean_pr_diff`, so
+  `spatial_response = "mean_pr_diff"` is available for
+  `plot.sdmTMB_mesh_comparison(type = "spatial")` — previously only
+  `compare_models()`/`compare_surveys()` computed it, so mesh comparisons
+  silently had one fewer (and arguably the most useful) spatial-plot option.
+- Documented what the `spatial_response` options (`"mean"`, `"pr_mean"`,
+  `"mean_pr_diff"`) actually compute and when to prefer each, in the `plot()`
+  methods of all three comparison functions (`?plot.sdmTMB_model_comparison`
+  etc.) and in the vignette.
+- `make_prediction_grid()` output now carries class `sdmTMB_prediction_grid`
+  and `crs`/`coord_multiplier`/`resolution` attributes, and gains a
+  `plot.sdmTMB_prediction_grid()` method: draws the grid points as squares on
+  a [ggOceanMaps::basemap()], optionally coloured by a column (`depth` by
+  default, when present).
+- `make_prediction_grid()` now extracts depth automatically when `max_depth`
+  is set and no `depth_fun` is supplied, via
+  `ggOceanMaps::get_depth(bathy.style = bathy_style)` (new `bathy_style`
+  argument, default `"raster_continuous"`, ggOceanMaps' bundled ETOPO grid —
+  no extra download path needed). A custom `depth_fun` still overrides this
+  for other bathymetry sources.
+- `compare_models()`, `compare_meshes()` and `compare_surveys()` no longer
+  leak `sdmTMB`'s informational "assuming the offset vector is 0" message
+  (from `predict.sdmTMB()`) when comparing models fit with an offset. This is
+  expected/correct — prediction grids aren't real hauls, so the offset is
+  deliberately zero and area-weighting is done via the `area` argument
+  instead — but it was showing on every spatial-difference calculation
+  (`.pred_diff_base()`, shared by all three comparison functions) with no way
+  to turn it off; `.safe_index()`'s `get_index_split()` call already
+  suppressed it.
+- Default `spatial_response` for all three comparison `plot()` methods changes
+  from `"pr_mean"` to `"mean_pr_diff"` — the more robust of the two percent
+  summaries (see the `spatial_response` docs/vignette for why).
+- Default `metric` for `plot.sdmTMB_mesh_cv()` changes from `"sum_loglik"` to
+  `"deltaNLL"` (now that its sign is fixed — see above), which is easier to
+  read at a glance than the raw summed log-likelihood.
+- `plot.sdmTMB_survey_comparison(type = "spatial")` gains the same
+  `fill_prefix` argument as `plot.sdmTMB_model_comparison()`.
+- `plot.sdmTMB_survey_comparison(type = "scatter")` gains an `annotate_fit`
+  argument (default `TRUE`): annotates each survey's regression line with its
+  fitted equation and R², coloured to match that survey.
+- `compare_models()` and `compare_meshes()` had the same silent-`NA`-CRS bug
+  as the `compare_surveys()` fix above; fixed the same way. Found by actually
+  running every function's roxygen example end-to-end (see below) — prior
+  examples happened to always pass `object_crs` explicitly, so this had never
+  surfaced.
+- `bubble_map()`'s legend was rendering as two separate, mismatched legends
+  (one binned colour swatch legend, one continuous size legend), and printed
+  an "Ignoring unknown labels: colour" warning. Fixed: the `fill`/`colour` and
+  `size` scales now use matching `guide = "bins"` so ggplot2 merges them into
+  one combined size+colour legend, and a redundant `shape` aesthetic mapping
+  (constant within each already-split zero/non-zero data subset, but was
+  breaking the guide merge even with `guide = "none"`) is now a fixed value
+  per layer instead of a mapped-but-hidden aesthetic.
+- Every exported function now has a working `@examples` block. Since `sdmTMB`
+  is an Imports (not Depends) dependency, unqualified calls like `pcod` or
+  `make_mesh()` fail outside a session with `library(sdmTMB)` attached — one
+  existing example (`plot_residual_qq()`) had this bug. Slow (model-fitting)
+  examples are wrapped in `\dontrun{}`, which — unlike `\donttest{}` — is
+  never run by this package's `R CMD check` (even under `--as-cran`) but does
+  run on the pkgdown site (`run_dont_run = TRUE` is now passed in
+  `.github/workflows/pkgdown.yaml`). See `memory/examples-policy.md`.
+- `sdmTMB_mesh_cv()` (spatial block cross-validation across mesh cutoffs,
+  via `blockCV::cv_spatial()` + `sdmTMB::sdmTMB_cv()`) is confirmed working
+  end-to-end and now has a real, runnable example (was previously untested,
+  with a placeholder example referencing an undefined `fit`).

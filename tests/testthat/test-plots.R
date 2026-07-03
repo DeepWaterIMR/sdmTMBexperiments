@@ -8,7 +8,7 @@ test_that("plotting helpers return ggplot objects", {
     time = "year", mesh = mesh, family = sdmTMB::tweedie(link = "log")
   )
   nd <- sdmTMB::replicate_df(sdmTMB::qcs_grid, "year", unique(sdmTMB::pcod$year))
-  pred <- predict(m, newdata = nd)
+  pred <- predict(m, newdata = nd, type = "response")
 
   expect_s3_class(plot_prediction_map(pred, crs = 32609), "ggplot")
   expect_s3_class(plot_random_field(pred, crs = 32609, field = "omega"), "ggplot")
@@ -36,4 +36,21 @@ test_that("plot_index handles a single index and a list", {
 test_that("plot_random_field errors when the field is absent", {
   pred <- data.frame(X = 1:3, Y = 1:3, est = 1:3)
   expect_error(plot_random_field(pred, crs = 32609, field = "omega"))
+})
+
+test_that("bubble_map merges the size/colour legend without warnings", {
+  # Regression test: mismatched guide types (binned fill/colour vs continuous
+  # size) produced two separate, mismatched legends instead of one, and a
+  # redundant mapped-but-guide-suppressed `shape` aesthetic broke the merge
+  # even after fixing the guide types, plus triggered an "Ignoring unknown
+  # labels: colour" warning.
+  skip_on_cran()
+  data(sebastes)
+  d <- subset(sebastes, year == max(sebastes$year))
+  expect_no_warning(p <- bubble_map(d, response = "density", by_year = FALSE))
+  expect_s3_class(p, "ggplot")
+  expect_no_warning(
+    p2 <- bubble_map(d, response = "density", by_year = FALSE, filled_circles = FALSE)
+  )
+  expect_s3_class(p2, "ggplot")
 })

@@ -104,13 +104,24 @@ plot_mesh <- function(
 #' faceted by time (`type = "annual"`).
 #'
 #' @param pred A prediction data frame from `predict(fit, newdata = ...)`,
-#'   containing coordinate columns and the response column.
+#'   containing coordinate columns and the response column. If the response
+#'   column is on the link scale (the default `predict()` output, e.g. log
+#'   density for a log-link family), it can be negative; combine with a
+#'   suitable `fill_limits` if you want to floor the colour scale, or use
+#'   `predict(fit, newdata = ..., type = "response")` for density-scale values.
 #' @param crs Coordinate reference system (projected, in metres).
 #' @param column Character. Name of the response column. Default `"est"`.
 #' @param type Character. `"mean"` (default) or `"annual"`.
 #' @param time_col Character. Name of the time column (for `type = "annual"`).
 #'   Default `"year"`.
-#' @param trans Character. Fill-scale transformation. Default `"sqrt"`.
+#' @param transform Character. Fill-scale transformation, passed to
+#'   `transform` in [ggplot2::continuous_scale()] (the successor to the
+#'   now-deprecated `trans` argument). Default `"identity"`.
+#' @param fill_limits Numeric vector of length two (either element may be
+#'   `NA`), passed to `limits` in [ggplot2::continuous_scale()]. Values outside
+#'   the limits are mapped to `NA` by ggplot2 and rendered as blank/grey cells.
+#'   Default `NULL`: the scale's range is taken from the data, so no cells are
+#'   dropped. Set e.g. `c(0, NA)` to floor a response-scale plot at zero.
 #' @param xy_cols Character vector of the coordinate columns. Default
 #'   `c("X", "Y")`.
 #' @param coord_multiplier Numeric factor to convert coordinates to CRS units.
@@ -120,9 +131,20 @@ plot_mesh <- function(
 #' @return A `ggplot` object.
 #'
 #' @author Mikko Vihtakari
-#' @seealso [ggOceanMaps::basemap()]
+#' @seealso [ggOceanMaps::basemap()], [ggplot2::continuous_scale()]
 #' @import ggplot2
 #' @importFrom rlang .data
+#' @examples
+#' \donttest{
+#' mesh <- sdmTMB::make_mesh(sdmTMB::pcod, c("X", "Y"), cutoff = 20)
+#' m <- sdmTMB::sdmTMB(
+#'   density ~ 0 + as.factor(year), data = sdmTMB::pcod, time = "year",
+#'   mesh = mesh, family = sdmTMB::tweedie()
+#' )
+#' nd <- sdmTMB::replicate_df(sdmTMB::qcs_grid, "year", unique(sdmTMB::pcod$year))
+#' pred <- predict(m, newdata = nd, type = "response")
+#' plot_prediction_map(pred, crs = 32609)
+#' }
 #' @export
 plot_prediction_map <- function(
   pred,
@@ -130,7 +152,8 @@ plot_prediction_map <- function(
   column = "est",
   type = c("mean", "annual"),
   time_col = "year",
-  trans = "sqrt",
+  transform = "identity",
+  fill_limits = NULL,
   xy_cols = c("X", "Y"),
   coord_multiplier = 1000,
   base_size = 11
@@ -144,16 +167,36 @@ plot_prediction_map <- function(
       dplyr::reframe(value = mean(.data[[column]], na.rm = TRUE))
   } else {
     d <- data.frame(
-      X = pred[[xy_cols[1]]], Y = pred[[xy_cols[2]]],
-      value = pred[[column]], time = pred[[time_col]]
+      X = pred[[xy_cols[1]]],
+      Y = pred[[xy_cols[2]]],
+      value = pred[[column]],
+      time = pred[[time_col]]
     )
     names(d)[1:2] <- xy_cols
+  }
+
+  if (!is.null(fill_limits)) {
+    below <- if (!is.na(fill_limits[1])) d$value < fill_limits[1] else FALSE
+    above <- if (!is.na(fill_limits[2])) d$value > fill_limits[2] else FALSE
+    if (any(below | above, na.rm = TRUE)) {
+      warning(
+        "`",
+        column,
+        "` has values outside `fill_limits` (",
+        paste(fill_limits, collapse = ", "),
+        "); those cells will render ",
+        "as blank/grey.",
+        call. = FALSE
+      )
+    }
   }
 
   d$.X <- d[[xy_cols[1]]] * coord_multiplier
   d$.Y <- d[[xy_cols[2]]] * coord_multiplier
   d_sf <- sf::st_as_sf(
-    d, coords = c(".X", ".Y"), crs = suppressWarnings(sf::st_crs(crs)),
+    d,
+    coords = c(".X", ".Y"),
+    crs = suppressWarnings(sf::st_crs(crs)),
     remove = FALSE
   )
 
@@ -162,7 +205,11 @@ plot_prediction_map <- function(
       data = d_sf,
       ggplot2::aes(x = .data$.X, y = .data$.Y, fill = .data$value)
     ) +
-    ggplot2::scale_fill_viridis_c(trans = trans, limits = c(0, NA), n.breaks = 4) +
+    ggplot2::scale_fill_viridis_c(
+      transform = transform,
+      limits = fill_limits,
+      n.breaks = 4
+    ) +
     ggplot2::labs(fill = column) +
     ggplot2::theme(
       legend.position = "bottom",
@@ -203,6 +250,18 @@ plot_prediction_map <- function(
 #' @seealso [ggOceanMaps::basemap()]
 #' @import ggplot2
 #' @importFrom rlang .data
+#' @examples
+#' \donttest{
+#' mesh <- sdmTMB::make_mesh(sdmTMB::pcod, c("X", "Y"), cutoff = 20)
+#' m <- sdmTMB::sdmTMB(
+#'   density ~ 0 + as.factor(year), data = sdmTMB::pcod, time = "year",
+#'   mesh = mesh, family = sdmTMB::tweedie()
+#' )
+#' nd <- sdmTMB::replicate_df(sdmTMB::qcs_grid, "year", unique(sdmTMB::pcod$year))
+#' pred <- predict(m, newdata = nd)
+#' plot_random_field(pred, crs = 32609, field = "omega")
+#' plot_random_field(pred, crs = 32609, field = "epsilon")
+#' }
 #' @export
 plot_random_field <- function(
   pred,
@@ -321,13 +380,12 @@ plot_index <- function(index, facet = TRUE, index_unit = NA, base_size = 11) {
   p <- p +
     ggplot2::geom_path() +
     ggplot2::expand_limits(y = 0) +
-    ggplot2::coord_cartesian(expand = FALSE) +
-    ggplot2::scale_x_continuous(breaks = scales::pretty_breaks(n = 10)) +
     ggplot2::labs(
       x = "Year",
       y = if (!is.na(index_unit)) paste0("Index (", index_unit, ")") else "Index value"
     ) +
-    ggplot2::theme_bw(base_size = base_size)
+    ggplot2::theme_bw(base_size = base_size) +
+    .index_axis_layers()
 
   if (grouped && facet) {
     p <- p + ggplot2::facet_wrap(~index, scales = "free_y")
@@ -356,6 +414,15 @@ plot_index <- function(index, facet = TRUE, index_unit = NA, base_size = 11) {
 #' @seealso [sdmTMB::tidy()]
 #' @import ggplot2
 #' @importFrom rlang .data
+#' @examples
+#' \donttest{
+#' mesh <- sdmTMB::make_mesh(sdmTMB::pcod, c("X", "Y"), cutoff = 20)
+#' m <- sdmTMB::sdmTMB(
+#'   density ~ 0 + as.factor(year) + depth_scaled, data = sdmTMB::pcod,
+#'   time = "year", mesh = mesh, family = sdmTMB::tweedie()
+#' )
+#' plot_fixed_effects(m)
+#' }
 #' @export
 plot_fixed_effects <- function(fit, base_size = 11) {
   if (!inherits(fit, "sdmTMB")) stop("`fit` must be a fitted sdmTMB model.")
@@ -403,6 +470,15 @@ plot_fixed_effects <- function(fit, base_size = 11) {
 #' @seealso [sdmTMB::tidy()]
 #' @import ggplot2
 #' @importFrom rlang .data
+#' @examples
+#' \donttest{
+#' mesh <- sdmTMB::make_mesh(sdmTMB::pcod, c("X", "Y"), cutoff = 20)
+#' m <- sdmTMB::sdmTMB(
+#'   density ~ 0 + as.factor(year), data = sdmTMB::pcod, time = "year",
+#'   mesh = mesh, family = sdmTMB::tweedie()
+#' )
+#' plot_variance_partitioning(m)
+#' }
 #' @export
 plot_variance_partitioning <- function(fit, base_size = 11) {
   if (!inherits(fit, "sdmTMB")) stop("`fit` must be a fitted sdmTMB model.")
@@ -459,6 +535,17 @@ plot_variance_partitioning <- function(fit, base_size = 11) {
 #' @author Mikko Vihtakari
 #' @import ggplot2
 #' @importFrom rlang .data
+#' @examples
+#' \donttest{
+#' mesh <- sdmTMB::make_mesh(sdmTMB::pcod, c("X", "Y"), cutoff = 20)
+#' m <- sdmTMB::sdmTMB(
+#'   density ~ 0 + as.factor(year), data = sdmTMB::pcod, time = "year",
+#'   mesh = mesh, family = sdmTMB::tweedie()
+#' )
+#' nd <- sdmTMB::replicate_df(sdmTMB::qcs_grid, "year", unique(sdmTMB::pcod$year))
+#' pred <- predict(m, newdata = nd, type = "response")
+#' plot_prediction_histogram(m, pred)
+#' }
 #' @export
 plot_prediction_histogram <- function(fit, pred, response = NULL,
                                        column = "est", base_size = 11) {
@@ -514,6 +601,19 @@ plot_prediction_histogram <- function(fit, pred, response = NULL,
 #' @seealso [stats::residuals()], `sdmTMB::residuals.sdmTMB()`
 #' @import ggplot2
 #' @importFrom rlang .data
+#' @examples
+#' \donttest{
+#' mesh <- sdmTMB::make_mesh(sdmTMB::pcod, c("X", "Y"), cutoff = 20)
+#' m1 <- sdmTMB::sdmTMB(
+#'   density ~ 0 + as.factor(year),
+#'   data = sdmTMB::pcod,
+#'   time = "year",
+#'   mesh = mesh,
+#'   family = sdmTMB::delta_lognormal()
+#' )
+#' # Automatically plots all components of the delta model
+#' plot_residual_qq(m1)
+#' }
 #' @export
 plot_residual_qq <- function(fit, type = "mle-mvn", base_size = 11) {
   if (!inherits(fit, "sdmTMB")) stop("`fit` must be a fitted sdmTMB model.")

@@ -3,6 +3,7 @@
 S3method(plot,sdmTMB_mesh_comparison)
 S3method(plot,sdmTMB_mesh_cv)
 S3method(plot,sdmTMB_model_comparison)
+S3method(plot,sdmTMB_prediction_grid)
 S3method(plot,sdmTMB_retro)
 S3method(plot,sdmTMB_survey_comparison)
 export("%>%")

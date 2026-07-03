@@ -9,8 +9,10 @@
   type = "index",
   index_divisor = NULL,
   unit = NA,
+  mohn = FALSE,
   viridis = FALSE,
-  spatial_response = "pr_mean",
+  spatial_response = "mean_pr_diff",
+  fill_prefix = NULL,
   transform_color_scale = TRUE,
   limit_rounding = 10,
   break_rounding = 5,
@@ -27,11 +29,21 @@
 
 \item{unit}{Character. Unit label for axes. If \code{NA}, \code{"Index value"} is used.}
 
+\item{mohn}{Logical. Annotate the index plot with Mohn's rho (via
+\code{\link[=mohns_rho]{mohns_rho()}})? Default \code{FALSE}. Only applies when \code{type = "index"}.}
+
 \item{viridis}{Logical. Use the viridis palette for model groups? Default
 \code{FALSE} (a fixed colour vector).}
 
 \item{spatial_response}{Character. Column mapped in spatial plots: one of
-\code{"mean"}, \code{"pr_mean"} or \code{"mean_pr_diff"}. Default \code{"pr_mean"}.}
+\code{"mean"}, \code{"pr_mean"} or \code{"mean_pr_diff"}. Default \code{"mean_pr_diff"}. See
+Details.}
+
+\item{fill_prefix}{Character. Prefix for the spatial-plot fill legend title
+(\code{type = "spatial"}), e.g. \code{"Biomass density"} or \code{"CPUE"}. If \code{NULL}
+(default), the legend title is \code{"Percent anomaly"}; otherwise
+\code{paste(fill_prefix, "percent anomaly", sep = "\\n")}. Models don't
+necessarily share a response variable, so this isn't inferred automatically.}
 
 \item{transform_color_scale}{Logical. Apply a signed square-root colour scale
 for spatial plots? Default \code{TRUE}.}
@@ -51,6 +63,46 @@ A \code{ggplot} object (\code{type = "index"}) or a \code{cowplot} grid
 Plots the results of \code{\link[=compare_models]{compare_models()}} as either a time series of survey
 indices (\code{type = "index"}) or spatial maps of prediction differences
 (\code{type = "spatial"}, rendered on a \code{\link[ggOceanMaps:basemap]{ggOceanMaps::basemap()}}).
+}
+\details{
+For \code{type = "spatial"}, each grid cell is compared between a fitted model
+and the reference model for every year they share, on the response scale
+(i.e. \code{predict(..., type = "response")}, e.g. density rather than log
+density): \code{diff = est - ref_est} and \code{pr_diff = 100 * diff / ref_est}
+(percent). \code{spatial_response} selects how these per-year values are
+summarised across years into the single value mapped for each cell:
+\itemize{
+\item \code{"mean"}: \code{mean(diff)} — the average absolute difference, in response
+units. Useful for the raw magnitude of disagreement, but not comparable
+across cells with very different baseline abundance.
+\item \code{"pr_mean"}: \code{mean(pr_diff)} — the average of the yearly percent
+differences. Because each year is divided by that year's own (possibly
+small) reference value, a handful of low-abundance years/cells can
+dominate this average with large percentage swings even when the
+absolute difference is small.
+\item \code{"mean_pr_diff"} (default): \code{100 * mean(diff) / mean(ref_est)} — the
+percent difference between the across-year mean predictions (a ratio of
+means, not a mean of ratios). This is usually the more robust
+percent-based summary, since a cell's overall multi-year baseline is used
+in the denominator instead of each individual year's value.
+}
+}
+\examples{
+\donttest{
+mesh <- sdmTMB::make_mesh(sdmTMB::pcod, c("X", "Y"), cutoff = 20)
+m1 <- sdmTMB::sdmTMB(
+  data = sdmTMB::pcod, formula = density ~ 0 + as.factor(year),
+  time = "year", mesh = mesh, family = sdmTMB::tweedie(link = "log")
+)
+m2 <- sdmTMB::sdmTMB(
+  data = sdmTMB::pcod, formula = density ~ 0 + as.factor(year) + depth_scaled,
+  time = "year", mesh = mesh, family = sdmTMB::tweedie(link = "log")
+)
+nd <- sdmTMB::replicate_df(sdmTMB::qcs_grid, "year", unique(sdmTMB::pcod$year))
+x <- compare_models(m1, m2, newdata = nd, object_crs = 32609)
+plot(x, mohn = TRUE)
+plot(x, type = "spatial", fill_prefix = "Biomass density")
+}
 }
 \seealso{
 \code{\link[=compare_models]{compare_models()}}

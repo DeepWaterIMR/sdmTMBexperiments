@@ -37,7 +37,7 @@ devtools::load_all()      # load for interactive development
 devtools::document()      # regenerate NAMESPACE + man/ (roxygen2)
 devtools::test()          # run testthat tests
 devtools::check()         # R CMD check
-pkgdown::build_site()     # build the website
+pkgdown::build_site()      # build the website (see Examples policy)
 ```
 
 ```bash

@@ -68,7 +68,7 @@ resulting survey indices and predictions to the original (reference) model.
 Useful for assessing the sensitivity of an index to mesh resolution.
 }
 \examples{
-\dontrun{
+\donttest{
 mesh <- sdmTMB::make_mesh(sdmTMB::pcod, c("X", "Y"), cutoff = 20)
 m <- sdmTMB::sdmTMB(
   data = sdmTMB::pcod, formula = density ~ 0 + as.factor(year),
@@ -76,7 +76,8 @@ m <- sdmTMB::sdmTMB(
 )
 nd <- sdmTMB::replicate_df(sdmTMB::qcs_grid, "year", unique(sdmTMB::pcod$year))
 mesh_indices <- compare_meshes(
-  object = m, mesh_cutoffs = c(10, 30), newdata = nd, reference_name = "20 km"
+  object = m, mesh_cutoffs = c(10, 30), newdata = nd, object_crs = 32609,
+  reference_name = "20 km"
 )
 plot(mesh_indices)
 }

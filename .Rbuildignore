@@ -13,4 +13,5 @@
 ^\.claude$
 ^\.DS_Store$
 ^README\.Rmd$
+^README\.html$
 ^\.plan$

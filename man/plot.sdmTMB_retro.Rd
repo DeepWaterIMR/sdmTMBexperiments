@@ -28,9 +28,16 @@ Creates a layered ggplot of retrospective (peeled) indices produced by
 (computed with \code{\link[=mohns_rho]{mohns_rho()}}) annotated on the plot.
 }
 \examples{
-\dontrun{
-# retr <- sdmTMB_retro(fit, newdata, nyears = 5)
-# plot(retr, index_divisor = 1e3, index_unit = "1000 t")
+\donttest{
+mesh <- sdmTMB::make_mesh(sdmTMB::pcod, c("X", "Y"), cutoff = 25)
+m <- sdmTMB::sdmTMB(
+  data = sdmTMB::pcod,
+  formula = density ~ 0 + as.factor(year),
+  time = "year", mesh = mesh, family = sdmTMB::tweedie(link = "log")
+)
+nd <- sdmTMB::replicate_df(sdmTMB::qcs_grid, "year", unique(sdmTMB::pcod$year))
+retr <- sdmTMB_retro(m, nd, nyears = 3, n_workers = 1)
+plot(retr, index_divisor = 1e3, index_unit = "1000 t")
 }
 }
 \seealso{

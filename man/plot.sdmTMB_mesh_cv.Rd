@@ -4,13 +4,13 @@
 \alias{plot.sdmTMB_mesh_cv}
 \title{Plot mesh cross-validation results}
 \usage{
-\method{plot}{sdmTMB_mesh_cv}(x, metric = "sum_loglik", base_size = 11, ...)
+\method{plot}{sdmTMB_mesh_cv}(x, metric = "deltaNLL", base_size = 11, ...)
 }
 \arguments{
 \item{x}{An object of class \code{sdmTMB_mesh_cv} from \code{\link[=sdmTMB_mesh_cv]{sdmTMB_mesh_cv()}}.}
 
-\item{metric}{Character. Which metric to plot: \code{"sum_loglik"} (default) or
-\code{"deltaAIC"}.}
+\item{metric}{Character. Which metric to plot: \code{"deltaNLL"} (default),
+\code{"sum_loglik"}, or \code{"deltaAIC"}.}
 
 \item{base_size}{Numeric. Base font size. Default \code{11}.}
 
@@ -21,6 +21,19 @@ A \code{ggplot} object.
 }
 \description{
 Plot mesh cross-validation results
+}
+\examples{
+\donttest{
+# Requires the 'blockCV' package.
+mesh <- sdmTMB::make_mesh(sdmTMB::pcod, c("X", "Y"), cutoff = 20)
+fit <- sdmTMB::sdmTMB(
+  data = sdmTMB::pcod, formula = density ~ 0 + as.factor(year),
+  time = "year", mesh = mesh, family = sdmTMB::tweedie(link = "log")
+)
+cv <- sdmTMB_mesh_cv(fit, mesh_cutoffs = c(15, 30), k = 3)
+plot(cv)
+plot(cv, metric = "deltaAIC")
+}
 }
 \seealso{
 \code{\link[=sdmTMB_mesh_cv]{sdmTMB_mesh_cv()}}

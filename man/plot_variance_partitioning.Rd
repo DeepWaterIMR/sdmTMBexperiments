@@ -20,6 +20,16 @@ components (spatial field \code{sigma_O}, spatiotemporal field \code{sigma_E}, s
 terms, and observation error \code{phi}) using \code{\link[sdmTMB:tidy]{sdmTMB::tidy()}}, and plots the
 proportion of variance explained by each.
 }
+\examples{
+\donttest{
+mesh <- sdmTMB::make_mesh(sdmTMB::pcod, c("X", "Y"), cutoff = 20)
+m <- sdmTMB::sdmTMB(
+  density ~ 0 + as.factor(year), data = sdmTMB::pcod, time = "year",
+  mesh = mesh, family = sdmTMB::tweedie()
+)
+plot_variance_partitioning(m)
+}
+}
 \seealso{
 \code{\link[sdmTMB:tidy]{sdmTMB::tidy()}}
 }

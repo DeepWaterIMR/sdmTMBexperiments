@@ -46,7 +46,7 @@
 #'
 #' @importFrom rlang .data
 #' @examples
-#' \dontrun{
+#' \donttest{
 #' mesh <- sdmTMB::make_mesh(sdmTMB::pcod, c("X", "Y"), cutoff = 25)
 #' m <- sdmTMB::sdmTMB(
 #'   data = sdmTMB::pcod,
@@ -88,20 +88,30 @@ sdmTMB_retro <- function(
   peeled_output <- future.apply::future_lapply(
     years,
     function(k) {
+      peel_data <- dplyr::filter(object$data, get(object$time) <= k)
+
       if (refit_meshes) {
         if (is.integer(future_seed)) set.seed(future_seed)
         knots <- object$spde$mesh$loc[, 1:2]
         approx_cutoff <- round(min(stats::dist(knots)), 0)
         mesh <- sdmTMB::make_mesh(
-          dplyr::filter(object$data, get(object$time) <= k),
+          peel_data,
           xy_cols = c("X", "Y"),
           cutoff = approx_cutoff
         )
       } else {
-        # Reuse the original mesh unchanged. (The previous implementation
-        # subset mesh$loc_xy by data rows, which is not valid for an SPDE mesh
-        # object because its vertices are not aligned with the data rows.)
-        mesh <- object$spde
+        # Reuse the original mesh geometry (SPDE vertices/triangulation)
+        # unchanged, but rebuild the data-to-mesh mapping (loc_xy, A_st,
+        # sdm_spatial_id) for the peeled data. An sdmTMBmesh object stores one
+        # row per fitted observation, so passing it through unchanged (or
+        # subsetting mesh$loc_xy by data rows) does not work once rows are
+        # peeled off: sdmTMB() then errors because nrow(data) no longer
+        # matches the mesh's stored coordinates.
+        mesh <- sdmTMB::make_mesh(
+          peel_data,
+          xy_cols = object$spde$xy_cols,
+          mesh = object$spde$mesh
+        )
       }
 
       predict_args$newdata <- newdata |>
@@ -115,7 +125,7 @@ sdmTMB_retro <- function(
           } else {
             object$formula[[1]]
           },
-          data = dplyr::filter(object$data, get(object$time) <= k),
+          data = peel_data,
           mesh = mesh,
           time = object$time,
           offset = object$offset[object$data[[object$time]] <= k],
@@ -175,9 +185,16 @@ sdmTMB_retro <- function(
 #' @import ggplot2
 #' @importFrom rlang .data
 #' @examples
-#' \dontrun{
-#' # retr <- sdmTMB_retro(fit, newdata, nyears = 5)
-#' # plot(retr, index_divisor = 1e3, index_unit = "1000 t")
+#' \donttest{
+#' mesh <- sdmTMB::make_mesh(sdmTMB::pcod, c("X", "Y"), cutoff = 25)
+#' m <- sdmTMB::sdmTMB(
+#'   data = sdmTMB::pcod,
+#'   formula = density ~ 0 + as.factor(year),
+#'   time = "year", mesh = mesh, family = sdmTMB::tweedie(link = "log")
+#' )
+#' nd <- sdmTMB::replicate_df(sdmTMB::qcs_grid, "year", unique(sdmTMB::pcod$year))
+#' retr <- sdmTMB_retro(m, nd, nyears = 3, n_workers = 1)
+#' plot(retr, index_divisor = 1e3, index_unit = "1000 t")
 #' }
 #' @method plot sdmTMB_retro
 #' @export
@@ -226,9 +243,8 @@ plot.sdmTMB_retro <- function(
     ggplot2::expand_limits(y = 0) +
     ggplot2::scale_color_viridis_d() +
     ggplot2::scale_fill_viridis_d() +
-    ggplot2::coord_cartesian(expand = FALSE) +
     ggplot2::scale_y_continuous(n.breaks = 6) +
-    ggplot2::scale_x_continuous(breaks = scales::pretty_breaks(n = 10)) +
     ggplot2::theme_classic(base_size = base_size) +
+    .index_axis_layers() +
     ggplot2::theme(legend.position = "bottom")
 }

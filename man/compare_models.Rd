@@ -62,7 +62,7 @@ sanity checks. The result can be plotted with
 \code{\link[=plot.sdmTMB_model_comparison]{plot.sdmTMB_model_comparison()}}.
 }
 \examples{
-\dontrun{
+\donttest{
 mesh <- sdmTMB::make_mesh(sdmTMB::pcod, c("X", "Y"), cutoff = 20)
 m1 <- sdmTMB::sdmTMB(
   data = sdmTMB::pcod, formula = density ~ 0 + as.factor(year),
