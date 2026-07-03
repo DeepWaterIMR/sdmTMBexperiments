@@ -153,6 +153,24 @@ examples/vignettes or from user review. Each is also noted in `NEWS.md`.
     searches for the largest `n_try <= n` whose `pretty()` breaks are all whole
     numbers (falling back to `scales::extended_breaks()` only if the range
     itself isn't whole numbers, e.g. a model using fractional years).
+18. **`R CMD check`/CI failed entirely on dependency resolution** — `sdmTMBextra`
+    was listed in `Suggests` (only referenced in one roxygen `[sdmTMBextra::
+    add_barrier_mesh()]` doc link, never actually used in code), but it's a
+    GitHub-only package (`pbs-assess/sdmTMBextra`), not on CRAN/Bioconductor.
+    `pak` (used by both `.github/workflows/R-CMD-check.yaml` and
+    `pkgdown.yaml` via `setup-r-dependencies`) can only resolve `Suggests`
+    from public repos, so both workflows failed at the dependency-resolution
+    step before running any actual check — "Can't find package called
+    sdmTMBextra." Fixed by removing it from `Suggests` and changing the
+    roxygen link to a plain code-font mention (`sdmTMBextra::
+    add_barrier_mesh()`, no `[...]` link) so it doesn't need to resolve.
+    While investigating, `devtools::check()` also surfaced three unrelated,
+    pre-existing issues, now fixed: a non-ASCII `R²` character in a `sprintf()`
+    string in `compare-surveys.R` (replaced with a `\u00B2` escape — CRAN
+    requires ASCII-only source outside comments); an undocumented `...`
+    argument in `plot.sdmTMB_prediction_grid()`; and a stray `Rplots.pdf` that
+    had been accidentally committed at the repo top level (added to
+    `.gitignore`/`.Rbuildignore`).
 
 ## Portability change
 The source repo used `future::multicore`; the package uses the portable

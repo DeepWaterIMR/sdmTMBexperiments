@@ -48,6 +48,8 @@ passed to \code{option} in \code{\link[ggplot2:scale_color_viridis_c]{ggplot2::s
 Default \code{"red"}.}
 
 \item{base_size}{Numeric. Base font size. Default \code{11}.}
+
+\item{...}{Currently ignored.}
 }
 \value{
 A \code{ggplot} object.

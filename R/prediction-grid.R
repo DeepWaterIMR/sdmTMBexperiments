@@ -217,6 +217,7 @@ make_prediction_grid <- function(
 #' @param color Character. Point colour used when not colouring by `value`.
 #'   Default `"red"`.
 #' @param base_size Numeric. Base font size. Default `11`.
+#' @param ... Currently ignored.
 #'
 #' @return A `ggplot` object.
 #'

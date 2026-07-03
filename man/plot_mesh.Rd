@@ -41,8 +41,9 @@ A \code{ggplot} object.
 \description{
 Draws a \code{\link[sdmTMB:make_mesh]{sdmTMB::make_mesh()}} mesh over a \code{\link[ggOceanMaps:basemap]{ggOceanMaps::basemap()}}, optionally
 overlaying the sampling positions as red points. When a barrier mesh is
-present (e.g. from \code{\link[sdmTMBextra:add_barrier_mesh]{sdmTMBextra::add_barrier_mesh()}}), the barrier ("land")
-triangles are marked with an \code{X}.
+present (e.g. from \code{sdmTMBextra::add_barrier_mesh()}, from the GitHub-only
+\href{https://github.com/pbs-assess/sdmTMBextra}{sdmTMBextra} package), the
+barrier ("land") triangles are marked with an \code{X}.
 }
 \examples{
 \donttest{

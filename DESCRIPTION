@@ -47,7 +47,6 @@ Suggests:
     ps,
     RColorBrewer,
     rmarkdown,
-    sdmTMBextra,
     testthat,
     tidyr    
 URL: https://github.com/DeepWaterIMR/sdmTMBexperiments, https://deepwaterimr.github.io/sdmTMBexperiments/

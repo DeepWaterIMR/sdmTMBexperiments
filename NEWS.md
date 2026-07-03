@@ -82,6 +82,14 @@ project-local helpers.
   sub-1 steps when that gives a better fit to the target break count. Whole
   year ranges now always get whole-year breaks (falling back to the regular
   algorithm only if the range itself isn't whole numbers).
+- `R CMD check` and CI (`R-CMD-check.yaml`, `pkgdown.yaml`) failed entirely at
+  dependency resolution: `sdmTMBextra` was listed in `Suggests` but is a
+  GitHub-only package (not on CRAN/Bioconductor), which `pak` can't resolve.
+  Removed it from `Suggests` (it was only referenced in one roxygen doc link,
+  never used in code). Also fixed, found while investigating: a non-ASCII
+  character in a `sprintf()` string in `compare-surveys.R`, an undocumented
+  `...` argument in `plot.sdmTMB_prediction_grid()`, and a stray `Rplots.pdf`
+  accidentally committed at the repo top level.
 
 ## Other changes
 

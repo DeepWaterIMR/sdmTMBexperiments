@@ -476,7 +476,7 @@ plot.sdmTMB_survey_comparison <- function(
         data.frame(
           model = s,
           label = sprintf(
-            "y = %.3g %s %.3gx\nR² = %.2f", cf[1], sign_op, abs(cf[2]), r2
+            "y = %.3g %s %.3gx\nR\u00B2 = %.2f", cf[1], sign_op, abs(cf[2]), r2
           )
         )
       }) |>

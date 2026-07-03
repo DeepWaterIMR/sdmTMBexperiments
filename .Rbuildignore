@@ -15,3 +15,7 @@
 ^README\.Rmd$
 ^README\.html$
 ^\.plan$
+^vignettes$
+^NEWS\.md$
+^tests$
+Rplots.pdf

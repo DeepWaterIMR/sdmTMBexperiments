@@ -9,8 +9,9 @@
 #' @description
 #' Draws a [sdmTMB::make_mesh()] mesh over a [ggOceanMaps::basemap()], optionally
 #' overlaying the sampling positions as red points. When a barrier mesh is
-#' present (e.g. from [sdmTMBextra::add_barrier_mesh()]), the barrier ("land")
-#' triangles are marked with an `X`.
+#' present (e.g. from `sdmTMBextra::add_barrier_mesh()`, from the GitHub-only
+#' [sdmTMBextra](https://github.com/pbs-assess/sdmTMBextra) package), the
+#' barrier ("land") triangles are marked with an `X`.
 #'
 #' @param mesh An sdmTMB mesh object (from [sdmTMB::make_mesh()], optionally with
 #'   a barrier mesh added).
