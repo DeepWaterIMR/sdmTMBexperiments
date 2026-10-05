@@ -27,6 +27,7 @@ test_that("make_prediction_grid errors on non-sf region", {
 test_that("make_prediction_grid extracts depth automatically via ggOceanMaps", {
   skip_on_cran()
   skip_if_not_installed("concaveman")
+  skip_if_not_installed("ggOceanMaps")
   data(sebastes)
   d <- subset(sebastes, cruiseseries == "EggaN")
   region <- make_survey_prediction_region(d, crs = 32633)
@@ -45,6 +46,7 @@ test_that("make_prediction_grid extracts depth automatically via ggOceanMaps", {
 
 test_that("plot.sdmTMB_prediction_grid works with and without a value column", {
   skip_if_not_installed("concaveman")
+  skip_if_no_map_data()
   data(sebastes)
   d <- subset(sebastes, cruiseseries == "EggaN")
   region <- make_survey_prediction_region(d, crs = 32633)

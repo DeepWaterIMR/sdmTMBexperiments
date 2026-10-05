@@ -21,7 +21,9 @@
 #' @param area Grid cell area for area-weighted index calculation. Passed to
 #'   [sdmTMB::get_index_split()].
 #' @param silent Logical. Suppress model output? Default `TRUE`.
-#' @param n_workers Integer. Number of parallel workers. Default `1`.
+#' @param n_workers Integer. Number of parallel workers. Default `1`, which
+#'   uses whatever [future::plan()] is currently set. Values `> 1` set a
+#'   temporary `future::multisession` plan.
 #' @param nsplit Integer. Number of splits for [sdmTMB::get_index_split()].
 #' @param future_seed Logical or integer. Future-compatible random seed for
 #'   parallel processing. See [future.apply::future_lapply()].
@@ -87,6 +89,11 @@ compare_models <- function(
   if (missing(newdata)) {
     stop("`newdata` must be provided for predictions.")
   }
+  xy_cols <- models[[reference_model]]$spde$xy_cols
+  if (!all(xy_cols %in% names(newdata))) {
+    stop("`newdata` must contain the model coordinate columns ",
+         paste(xy_cols, collapse = ", "), ".")
+  }
 
   if (is.null(object_crs)) {
     mesh_crs <- models[[1]]$spde$mesh$crs
@@ -98,8 +105,8 @@ compare_models <- function(
     }
   }
 
-  old_plan <- .setup_parallel(n_workers)
-  on.exit(future::plan(old_plan), add = TRUE)
+  old_parallel <- .setup_parallel(n_workers)
+  on.exit(.restore_parallel(old_parallel), add = TRUE)
 
   # Sanity + negative log-likelihood ------------------------------------------
   model_sanity <- as.data.frame(
@@ -138,11 +145,12 @@ compare_models <- function(
       if (inherits(k, "try-error")) {
         return(data.frame(
           reference_model = ref_name, compared_model = comp_name,
-          year = newdata[[ref_mod$time]], X = newdata$X, Y = newdata$Y,
+          year = newdata[[ref_mod$time]],
+          X = newdata[[xy_cols[1]]], Y = newdata[[xy_cols[2]]],
           est = NA, ref_est = NA, diff = NA, pr_diff = NA, mean_pr_diff = NA
         ))
       }
-      base <- .pred_diff_base(k, ref_mod, newdata, ref_mod$time)
+      base <- .pred_diff_base(k, ref_mod, newdata, ref_mod$time, xy_cols)
       base$reference_model <- ref_name
       base$compared_model <- comp_name
       base |>
@@ -276,7 +284,7 @@ plot.sdmTMB_model_comparison <- function(
 
     n_other <- length(unique(dat$model)) - 1
     index_colors <- if (viridis) {
-      c("black", viridis::viridis(n_other))
+      c("black", scales::viridis_pal()(n_other))
     } else {
       c("black", .index_color_vector[seq_len(n_other)])
     }

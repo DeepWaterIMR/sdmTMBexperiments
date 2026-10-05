@@ -29,7 +29,9 @@
 #' data(sebastes)
 #' eggan <- subset(sebastes, cruiseseries == "EggaN")
 #' region <- make_survey_prediction_region(eggan, crs = 32633, concavity = 5)
-#' ggOceanMaps::qmap(region, fill = I(NA))
+#' if (requireNamespace("ggOceanMaps", quietly = TRUE)) {
+#'   ggOceanMaps::qmap(region, fill = I(NA))
+#' }
 #' }
 #' @export
 make_survey_prediction_region <- function(
@@ -168,7 +170,9 @@ make_prediction_grid <- function(
 
   if (!is.null(max_depth)) {
     if (is.null(depth_fun)) {
+      rlang::check_installed("ggOceanMaps", reason = "to extract depths.")
       depth_fun <- function(pts) {
+        .attach_ggOceanMaps()
         ggOceanMaps::get_depth(pts, bathy.style = bathy_style, bind = FALSE)
       }
     }
@@ -272,7 +276,7 @@ plot.sdmTMB_prediction_grid <- function(
     remove = FALSE
   )
 
-  p <- ggOceanMaps::basemap(d_sf, crs = crs, base_size = base_size)
+  p <- .basemap(d_sf, crs = crs, base_size = base_size)
 
   has_value <- !is.null(value) && value %in% names(d)
   if (has_value) {

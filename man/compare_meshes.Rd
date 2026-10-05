@@ -28,7 +28,7 @@ model coordinates, typically km) to compare.}
 
 \item{newdata}{A data frame for predictions, with the same predictor columns
 as the fitted data and a time column matching the fitted data. Must contain
-\code{X} and \code{Y} columns.}
+the model's coordinate columns (\code{object$spde$xy_cols}).}
 
 \item{object_crs}{Coordinate reference system for the model data. If \code{NULL}
 (default), extracted from the model's mesh.}
@@ -46,7 +46,9 @@ Default \code{FALSE}.}
 
 \item{silent}{Logical. Suppress model output? Default \code{TRUE}.}
 
-\item{n_workers}{Integer. Number of parallel workers. Default \code{1}.}
+\item{n_workers}{Integer. Number of parallel workers. Default \code{1}, which
+uses whatever \code{\link[future:plan]{future::plan()}} is currently set. Values \verb{> 1} set a
+temporary \code{future::multisession} plan.}
 
 \item{nsplit}{Integer. Number of splits for \code{\link[sdmTMB:get_index_split]{sdmTMB::get_index_split()}}.
 Default \code{3}.}
@@ -59,13 +61,16 @@ Default \code{"Reference"}.}
 }
 \value{
 An object of class \code{sdmTMB_mesh_comparison}, a list with \code{index},
-\code{pred_diff} (and optionally \code{models}). Carries \code{crs} and \code{reference_name}
+\code{pred_diff} (and optionally \code{models}). Coordinates in \code{pred_diff} are
+returned as \code{X} and \code{Y} columns. Carries \code{crs} and \code{reference_name}
 attributes.
 }
 \description{
 Refits an sdmTMB model using a range of mesh cutoff values and compares the
 resulting survey indices and predictions to the original (reference) model.
-Useful for assessing the sensitivity of an index to mesh resolution.
+Useful for assessing the sensitivity of an index to mesh resolution. All
+model settings are inherited from the original call of the fitted \code{object}
+(as with \code{\link[sdmTMB:update.sdmTMB]{sdmTMB::update.sdmTMB()}}); only \code{mesh} is replaced.
 }
 \examples{
 \donttest{

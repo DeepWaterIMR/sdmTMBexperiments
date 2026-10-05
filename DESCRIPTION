@@ -17,7 +17,6 @@ Description: A collection of experimental helper functions for working
 License: GPL (>= 3)
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 8.0.0
 Config/testthat/edition: 3
 Imports: 
     cowplot,
@@ -25,20 +24,18 @@ Imports:
     future,
     future.apply,
     ggplot2,
-    magrittr,
-    plyr,
     rlang,
     scales,
     sdmTMB,
     sf,
     stats,
-    tibble,
-    viridis
+    tibble
 Suggests: 
     blockCV,
     cli,
     concaveman,
     DHARMa,
+    ggOceanMaps,
     ggspatial,
     inlabru,
     knitr,
@@ -53,6 +50,6 @@ URL: https://github.com/DeepWaterIMR/sdmTMBexperiments, https://deepwaterimr.git
 BugReports: https://github.com/DeepWaterIMR/sdmTMBexperiments/issues
 VignetteBuilder: knitr
 Depends: 
-    ggOceanMaps,
     R (>= 4.1.0)
 LazyData: true
+Config/roxygen2/version: 8.1.0

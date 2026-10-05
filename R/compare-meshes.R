@@ -3,14 +3,16 @@
 #' @description
 #' Refits an sdmTMB model using a range of mesh cutoff values and compares the
 #' resulting survey indices and predictions to the original (reference) model.
-#' Useful for assessing the sensitivity of an index to mesh resolution.
+#' Useful for assessing the sensitivity of an index to mesh resolution. All
+#' model settings are inherited from the original call of the fitted `object`
+#' (as with [sdmTMB::update.sdmTMB()]); only `mesh` is replaced.
 #'
 #' @param object A fitted model from [sdmTMB::sdmTMB()].
 #' @param mesh_cutoffs Numeric vector of mesh cutoff values (in the units of the
 #'   model coordinates, typically km) to compare.
 #' @param newdata A data frame for predictions, with the same predictor columns
 #'   as the fitted data and a time column matching the fitted data. Must contain
-#'   `X` and `Y` columns.
+#'   the model's coordinate columns (`object$spde$xy_cols`).
 #' @param object_crs Coordinate reference system for the model data. If `NULL`
 #'   (default), extracted from the model's mesh.
 #' @param bias_correct Logical. Apply bias correction via [TMB::sdreport()]?
@@ -21,7 +23,9 @@
 #' @param save_models Logical. Retain fitted model objects in the output? Default
 #'   `FALSE`.
 #' @param silent Logical. Suppress model output? Default `TRUE`.
-#' @param n_workers Integer. Number of parallel workers. Default `1`.
+#' @param n_workers Integer. Number of parallel workers. Default `1`, which
+#'   uses whatever [future::plan()] is currently set. Values `> 1` set a
+#'   temporary `future::multisession` plan.
 #' @param nsplit Integer. Number of splits for [sdmTMB::get_index_split()].
 #'   Default `3`.
 #' @param future_seed Logical or integer. Future-compatible random seed for
@@ -30,7 +34,8 @@
 #'   Default `"Reference"`.
 #'
 #' @return An object of class `sdmTMB_mesh_comparison`, a list with `index`,
-#'   `pred_diff` (and optionally `models`). Carries `crs` and `reference_name`
+#'   `pred_diff` (and optionally `models`). Coordinates in `pred_diff` are
+#'   returned as `X` and `Y` columns. Carries `crs` and `reference_name`
 #'   attributes.
 #'
 #' @author Mikko Vihtakari
@@ -71,14 +76,13 @@ compare_meshes <- function(
   if (!inherits(object, "sdmTMB")) {
     stop("`object` must be a fitted sdmTMB model.")
   }
-  if (!all(c("X", "Y") %in% names(newdata))) {
-    stop("`newdata` must contain `X` and `Y` columns matching the model coordinates.")
+  xy_cols <- object$spde$xy_cols
+  if (!all(xy_cols %in% names(newdata))) {
+    stop("`newdata` must contain the model coordinate columns ",
+         paste(xy_cols, collapse = ", "), ".")
   }
 
   dt <- object$data
-  if (!all(c("X", "Y") %in% names(dt))) {
-    stop("The model data must contain `X` and `Y` columns.")
-  }
 
   if (is.null(object_crs)) {
     mesh_crs <- object$spde$mesh$crs
@@ -91,13 +95,15 @@ compare_meshes <- function(
     object_crs <- sf::st_crs(mesh_crs)
   }
 
-  old_plan <- .setup_parallel(n_workers)
-  on.exit(future::plan(old_plan), add = TRUE)
+  # Evaluated on the main process so the arguments reach the workers
+  refit_args <- .refit_args(object)
+
+  old_parallel <- .setup_parallel(n_workers)
+  on.exit(.restore_parallel(old_parallel), add = TRUE)
 
   # Meshes (alternative cutoffs + the original as reference) ------------------
   meshes <- lapply(mesh_cutoffs, function(k) {
-    if (is.integer(future_seed)) set.seed(future_seed)
-    sdmTMB::make_mesh(dt, xy_cols = c("X", "Y"), cutoff = k)
+    sdmTMB::make_mesh(dt, xy_cols = xy_cols, cutoff = k)
   })
   names(meshes) <- mesh_cutoffs
   meshes <- c(meshes, stats::setNames(list(object$spde), reference_name))
@@ -106,21 +112,13 @@ compare_meshes <- function(
   mmods <- future.apply::future_lapply(
     seq_along(meshes),
     function(j) {
-      try(
-        sdmTMB::sdmTMB(
-          formula = if (length(object$formula) > 1) object$formula else object$formula[[1]],
-          data = dt,
-          mesh = meshes[[j]],
-          time = object$time,
-          offset = object$offset,
-          family = object$family,
-          spatial = lapply(object$spatial, function(g) g),
-          spatiotemporal = lapply(object$spatiotemporal, function(g) g),
-          control = object$control,
-          silent = silent
-        ),
+      out <- try(
+        .refit(refit_args, data = dt, mesh = meshes[[j]],
+               rows = seq_len(nrow(dt)), silent = silent),
         silent = TRUE
       )
+      .report_fit(out, paste("cutoff", names(meshes)[j]))
+      out
     },
     future.seed = future_seed
   )
@@ -162,12 +160,12 @@ compare_meshes <- function(
       if (inherits(k, "try-error")) {
         return(data.frame(
           cutoff = cutoff_name, year = newdata[[object$time]],
-          X = newdata$X, Y = newdata$Y,
+          X = newdata[[xy_cols[1]]], Y = newdata[[xy_cols[2]]],
           depth = if ("depth" %in% names(newdata)) newdata$depth else NA,
           est = NA, ref_est = NA, diff = NA, pr_diff = NA, mean_pr_diff = NA
         ))
       }
-      base <- .pred_diff_base(k, ref_mod, newdata, object$time)
+      base <- .pred_diff_base(k, ref_mod, newdata, object$time, xy_cols)
       base$cutoff <- cutoff_name
       base |>
         dplyr::group_by(.data$cutoff, .data$X, .data$Y) |>
@@ -293,7 +291,7 @@ plot.sdmTMB_mesh_comparison <- function(
 
     n_other <- length(unique(dat$cutoff)) - 1
     index_colors <- if (viridis) {
-      c("black", viridis::viridis(n_other))
+      c("black", scales::viridis_pal()(n_other))
     } else {
       c("black", .safe_brewer(n_other, "Set1"))
     }

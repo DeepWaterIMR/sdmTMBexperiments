@@ -42,7 +42,9 @@ Default \code{FALSE}.}
 
 \item{silent}{Logical. Suppress model output? Default \code{TRUE}.}
 
-\item{n_workers}{Integer. Number of parallel workers. Default \code{1}.}
+\item{n_workers}{Integer. Number of parallel workers. Default \code{1}, which
+uses whatever \code{\link[future:plan]{future::plan()}} is currently set. Values \verb{> 1} set a
+temporary \code{future::multisession} plan.}
 
 \item{nsplit}{Integer. Number of splits for \code{\link[sdmTMB:get_index_split]{sdmTMB::get_index_split()}}.}
 

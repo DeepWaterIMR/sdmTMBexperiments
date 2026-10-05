@@ -5,28 +5,162 @@
 
 #' Configure a future parallel plan
 #'
-#' Captures the current future plan, installs a new one, and sets a sensible
-#' `future.globals.maxSize`. Returns the previous plan so the caller can restore
-#' it with `on.exit()`.
+#' Captures the current future plan and `future.globals.maxSize`, and sets a
+#' sensible `future.globals.maxSize`. Returns the previous settings so the
+#' caller can restore them with `on.exit(.restore_parallel(old))`.
 #'
-#' A portable `multisession` plan is used for `n_workers > 1` (works on all
-#' platforms, including Windows). Users who want forked (`multicore`) or
-#' cluster workers can set their own plan before calling and pass
-#' `n_workers = 1` to leave it untouched.
+#' The user's own [future::plan()] is respected and left untouched when
+#' `n_workers = 1`. Only when the user explicitly asks for `n_workers > 1` is a
+#' portable `multisession` plan installed (works on all platforms, including
+#' Windows) for the duration of the call. Users who want forked (`multicore`)
+#' or cluster workers can set their own plan before calling and keep
+#' `n_workers = 1`.
 #'
 #' @param n_workers Integer number of workers.
-#' @return The previous future plan.
+#' @return A list with the previous future plan and option value.
 #' @keywords internal
 #' @noRd
 .setup_parallel <- function(n_workers) {
-  old_plan <- future::plan()
+  old <- list(
+    plan = future::plan(),
+    max_size = getOption("future.globals.maxSize")
+  )
   if (n_workers > 1) {
     future::plan(future::multisession, workers = n_workers)
-  } else {
-    future::plan(future::sequential)
   }
   .set_future_memory()
-  old_plan
+  old
+}
+
+#' Restore the settings changed by `.setup_parallel()`
+#'
+#' @param old The list returned by `.setup_parallel()`.
+#' @keywords internal
+#' @noRd
+.restore_parallel <- function(old) {
+  future::plan(old$plan)
+  options(future.globals.maxSize = old$max_size)
+  invisible(NULL)
+}
+
+#' Evaluate the arguments of the original sdmTMB call for refitting
+#'
+#' Starts from `object$call` (as [sdmTMB::update.sdmTMB()] does) so every
+#' argument the user supplied to [sdmTMB::sdmTMB()] (e.g. `spatial_varying`,
+#' `time_varying`, `extra_time`, `weights`, `priors`, `share_range`,
+#' `anisotropy`, `reml`, ...) is carried over to refits. The arguments are
+#' evaluated here, on the main process, because symbols inside a call object
+#' (e.g. `priors = my_priors`) do not exist in a `future` worker and are not
+#' seen by `future`'s globals detection. The result is a plain list that can
+#' be sent to workers and used with `.refit()`.
+#'
+#' `data`, `mesh` and `silent` are supplied later by `.refit()`;
+#' `previous_fit` is dropped since it does not apply to new data/meshes.
+#' `control` is taken from the fitted object (including its backend).
+#'
+#' @param object A fitted sdmTMB model.
+#' @param ... Named arguments that override those of the original call.
+#' @param subset_ok Logical. Will the refits be on (a row subset of)
+#'   `object$data`? If `FALSE`, row-aligned vector arguments (numeric `offset`,
+#'   `weights`) cannot be carried over and an error is thrown.
+#' @param envir Environment in which to evaluate the call's arguments.
+#' @return A named list of arguments for [sdmTMB::sdmTMB()].
+#' @keywords internal
+#' @noRd
+.refit_args <- function(
+  object,
+  ...,
+  subset_ok = TRUE,
+  envir = environment(object$formula[[1]])
+) {
+  if (is.null(envir)) envir <- globalenv()
+  call_args <- as.list(object$call)[-1]
+  call_args <- call_args[!names(call_args) %in%
+    c("data", "mesh", "silent", "control", "previous_fit", "formula")]
+
+  args <- lapply(names(call_args), function(nm) {
+    tryCatch(
+      eval(call_args[[nm]], envir = envir),
+      error = function(e) {
+        stop("Could not evaluate argument `", nm, "` of the original sdmTMB ",
+             "call for refitting: ", conditionMessage(e), call. = FALSE)
+      }
+    )
+  })
+  names(args) <- names(call_args)
+
+  args$formula <- if (length(object$formula) > 1) {
+    object$formula
+  } else {
+    object$formula[[1]]
+  }
+  control <- object$control
+  if (!is.null(object$backend)) control$backend <- object$backend
+  args$control <- control
+
+  overrides <- list(...)
+  for (nm in names(overrides)) args[nm] <- list(overrides[[nm]])
+
+  if (!subset_ok) {
+    for (nm in c("offset", "weights")) {
+      if (is.numeric(args[[nm]])) {
+        stop("The model was fitted with a numeric `", nm, "` vector, which ",
+             "cannot be carried over to new data. Refit the model with `",
+             nm, "` given as a data column", if (nm == "offset") {
+               " or supply `offset_col`"
+             }, ".", call. = FALSE)
+      }
+    }
+  }
+  args
+}
+
+#' Refit an sdmTMB model with new data and mesh, keeping all other settings
+#'
+#' @param args A list from `.refit_args()`.
+#' @param data The new data.
+#' @param mesh The new mesh (built from `data`).
+#' @param rows Logical or integer index of the rows of the original model data
+#'   kept in `data`, used to subset row-aligned vector arguments (numeric
+#'   `offset`, `weights`). Character (column name) offsets are left alone and
+#'   looked up in the new `data`.
+#' @param silent Passed to [sdmTMB::sdmTMB()].
+#' @return A fitted sdmTMB model.
+#' @keywords internal
+#' @noRd
+.refit <- function(args, data, mesh, rows = NULL, silent = TRUE) {
+  for (nm in c("offset", "weights")) {
+    if (is.numeric(args[[nm]]) && !is.null(rows)) {
+      args[[nm]] <- args[[nm]][rows]
+    }
+  }
+  args$data <- data
+  args$mesh <- mesh
+  args$silent <- silent
+  do.call(sdmTMB::sdmTMB, args)
+}
+
+#' Report a failed or suspicious fit
+#'
+#' A `try-error` means the fit errored (not that it failed to converge); report
+#' the actual error. Fits that ran but fail [sdmTMB::sanity()] are flagged
+#' separately.
+#'
+#' @param fit A fitted sdmTMB model or a `try-error`.
+#' @param label Character label used in the message.
+#' @keywords internal
+#' @noRd
+.report_fit <- function(fit, label) {
+  if (inherits(fit, "try-error")) {
+    message("Model for ", label, " failed with error: ",
+            conditionMessage(attr(fit, "condition")),
+            " Adding NAs as index values.")
+  } else if (!isTRUE(all(unlist(
+    suppressMessages(sdmTMB::sanity(fit, silent = TRUE))
+  )))) {
+    message("Model for ", label, " did not pass sdmTMB::sanity() checks.")
+  }
+  invisible(NULL)
 }
 
 #' Set future.globals.maxSize for transferring fitted models to workers
@@ -136,13 +270,16 @@
 #' column is carried through when present in `newdata`.
 #'
 #' @param mod,ref_mod Fitted sdmTMB models.
-#' @param newdata Prediction grid data frame with `X`, `Y` and `time_col`.
+#' @param newdata Prediction grid data frame with `xy_cols` and `time_col`.
 #' @param time_col Name of the time column.
+#' @param xy_cols Names of the coordinate columns in `newdata`. They are
+#'   returned as `X` and `Y`.
 #' @return A data frame with `year`, `X`, `Y`, (`depth`), `est`, `ref_est`,
 #'   `diff` (`est - ref_est`), `pr_diff` (`100 * diff / ref_est`).
 #' @keywords internal
 #' @noRd
-.pred_diff_base <- function(mod, ref_mod, newdata, time_col) {
+.pred_diff_base <- function(mod, ref_mod, newdata, time_col,
+                            xy_cols = c("X", "Y")) {
   nd <- dplyr::filter(
     newdata,
     .data[[time_col]] %in% unique(mod$data[[time_col]])
@@ -161,8 +298,8 @@
 
   out <- data.frame(
     year = nd[[time_col]],
-    X = nd$X,
-    Y = nd$Y,
+    X = nd[[xy_cols[1]]],
+    Y = nd[[xy_cols[2]]],
     est = pred$est,
     ref_est = pred_ref$est,
     diff = pred$est - pred_ref$est,
@@ -430,7 +567,7 @@
     }
   }
 
-  ggOceanMaps::basemap(agg, crs = crs, base_size = base_size) +
+  .basemap(agg, crs = crs, base_size = base_size) +
     ggplot2::geom_raster(
       data = agg,
       ggplot2::aes(x = .data$X, y = .data$Y, fill = .data[[spatial_response]])
@@ -450,4 +587,44 @@
       legend.box.background = ggplot2::element_blank(),
       plot.margin = ggplot2::margin(5.5, 10, 5.5, 5.5)
     )
+}
+
+#' Attach ggOceanMaps for the duration of the calling function
+#'
+#' ggOceanMaps looks up its built-in map data (e.g. `dd_land`) by name via the
+#' search path, so map calls fail with "object 'dd_land' not found" when the
+#' package is only loaded (`ggOceanMaps::`) and not attached (`library()`).
+#' Attaches it if needed and detaches again when the caller exits.
+#' @param env Frame whose exit triggers the detach.
+#' @keywords internal
+#' @noRd
+.attach_ggOceanMaps <- function(env = parent.frame()) {
+  if (!"package:ggOceanMaps" %in% search()) {
+    suppressMessages(attachNamespace("ggOceanMaps"))
+    do.call(on.exit, list(quote(detach("package:ggOceanMaps")), add = TRUE),
+      envir = env)
+  }
+  invisible()
+}
+
+#' A basemap that falls back to a plain map without ggOceanMaps
+#'
+#' Uses [ggOceanMaps::basemap()] when \pkg{ggOceanMaps} is installed.
+#' Otherwise returns a plain `ggplot2` map (no land polygons) with the extent
+#' and projection of `data`, so non-marine users can still draw the maps.
+#'
+#' @param data An `sf` object defining the map extent.
+#' @param crs Coordinate reference system of the map.
+#' @param base_size Base font size.
+#' @keywords internal
+#' @noRd
+.basemap <- function(data, crs, base_size = 11) {
+  if (requireNamespace("ggOceanMaps", quietly = TRUE)) {
+    .attach_ggOceanMaps()
+    return(ggOceanMaps::basemap(data, crs = crs, base_size = base_size))
+  }
+  ggplot2::ggplot() +
+    ggplot2::geom_sf(data = data, alpha = 0, inherit.aes = FALSE) +
+    ggplot2::coord_sf(crs = suppressWarnings(sf::st_crs(crs))) +
+    ggplot2::theme_bw(base_size = base_size)
 }

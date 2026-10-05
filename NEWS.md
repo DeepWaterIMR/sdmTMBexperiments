@@ -1,3 +1,44 @@
+# sdmTMBexperiments (development version)
+
+## Bug fixes
+
+- `sdmTMB_retro()`, `compare_meshes()`, `sdmTMB_mesh_cv()` and
+  `compare_surveys()` (with `compiled_model`) now refit models from the
+  original `sdmTMB()` call, as `sdmTMB::update.sdmTMB()` does, instead of
+  rebuilding the call from a handful of fields. Previously settings such as
+  `spatial_varying`, `time_varying`, `extra_time`, `weights`, `priors`,
+  `share_range`, `anisotropy` and `reml` were silently dropped, and
+  `sdmTMB_mesh_cv()` also dropped the offset. The call's arguments are
+  evaluated on the main process so they also reach parallel workers.
+  `compare_surveys()` errors on a numeric `offset`/`weights` vector it cannot
+  subset to the survey data.
+- Coordinate columns are no longer assumed to be `X`/`Y`: fitted models use
+  `object$spde$xy_cols`, and `compare_surveys()` gains an `xy_cols` argument
+  for `compiled_model = NULL`.
+- Failed fits now report the actual error instead of "did not converge", and
+  fits that ran but fail `sdmTMB::sanity()` are flagged.
+
+## Breaking changes
+
+- `sdmTMB_retro(refit_meshes = TRUE)` now requires a `cutoff` argument
+  instead of approximating it from the minimum mesh vertex distance.
+- `sdmTMB_retro()`'s `n_workers` defaults to `1` (was `nyears`). With
+  `n_workers = 1` all functions now use the user's current `future::plan()`
+  instead of forcing a sequential one, and `future.globals.maxSize` is
+  restored on exit.
+- The `%>%` re-export is removed.
+
+## Other changes
+
+- `ggOceanMaps` moves from Depends to Suggests. Spatial plots fall back to a
+  plain map without it; `bubble_map()` and automatic depth extraction in
+  `make_prediction_grid()` require it.
+- `plyr`, `magrittr` and `viridis` are no longer dependencies.
+- `sdmTMB_mesh_cv()` documents AIC across meshes as a rough guide only.
+- `tests/` and `vignettes/` are no longer build-ignored, so `R CMD check` on
+  CI now runs the tests and builds the vignette. New tests check that refits
+  reproduce the original fit.
+
 # sdmTMBexperiments 0.1.0
 
 First release. Experimental helper functions for fitted

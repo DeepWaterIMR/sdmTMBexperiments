@@ -2,6 +2,7 @@
 
 test_that("plotting helpers return ggplot objects", {
   skip_on_cran()
+  skip_if_no_map_data()
   mesh <- sdmTMB::make_mesh(sdmTMB::pcod, c("X", "Y"), cutoff = 25)
   m <- sdmTMB::sdmTMB(
     data = sdmTMB::pcod, formula = density ~ 0 + as.factor(year),
@@ -45,6 +46,8 @@ test_that("bubble_map merges the size/colour legend without warnings", {
   # even after fixing the guide types, plus triggered an "Ignoring unknown
   # labels: colour" warning.
   skip_on_cran()
+  skip_if_not_installed("ggspatial")
+  skip_if_no_map_data()
   data(sebastes)
   d <- subset(sebastes, year == max(sebastes$year))
   expect_no_warning(p <- bubble_map(d, response = "density", by_year = FALSE))

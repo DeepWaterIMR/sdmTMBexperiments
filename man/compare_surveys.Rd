@@ -19,6 +19,7 @@ compare_surveys(
   mesh_cutoff = 30,
   offset_col = NULL,
   survey_col = "cruiseseries",
+  xy_cols = c("X", "Y"),
   bias_correct = FALSE,
   level = 0.95,
   area = 1,
@@ -33,17 +34,26 @@ compare_surveys(
 }
 \arguments{
 \item{data}{A data frame containing the modelling data, with a column
-identifying the survey series (see \code{survey_col}) and \code{X}/\code{Y} coordinates.}
+identifying the survey series (see \code{survey_col}) and coordinate columns
+(see \code{xy_cols}).}
 
 \item{compiled_index}{A data frame of the compiled reference index, with
 columns \code{year}, \code{est}, \code{lwr}, \code{upr}, \code{se}.}
 
 \item{compiled_model}{A fitted \code{\link[sdmTMB:sdmTMB]{sdmTMB::sdmTMB()}} model for the compiled
-index, or \code{NULL} (default). When provided, model settings (family,
-spatiotemporal structure, time column, CRS) are inherited unless overridden,
-and spatial prediction differences are computed. When \code{NULL}, spatial
-differences are skipped and \code{formula}, \code{family} and \code{object_crs} must be
-supplied.}
+index, or \code{NULL} (default). When provided, all settings of its original
+call (as with \code{\link[sdmTMB:update.sdmTMB]{sdmTMB::update.sdmTMB()}}; e.g. family, random fields, time
+column, \code{spatial_varying}, \code{priors}, ...), its coordinate columns and CRS
+are inherited, except those overridden by \code{formula}, \code{family}, \code{spatial},
+\code{spatiotemporal}, \code{control} and \code{offset_col}. Its \code{data} and \code{mesh} are
+replaced by each survey's data and a new mesh. A numeric \code{offset} or
+\code{weights} vector in the original call cannot be carried over to the
+survey subsets and gives an error (use \code{offset_col} or column-name
+arguments instead). Spatial prediction differences are computed. When
+\code{NULL}, spatial differences are skipped, \code{formula}, \code{family} and
+\code{object_crs} must be supplied, and the survey models use only \code{formula},
+\code{family}, \code{spatial}, \code{spatiotemporal}, \code{control}, \code{offset_col}, a \code{"year"}
+time column and the \code{xy_cols} coordinates.}
 
 \item{surveys}{Character vector of survey series names to compare. If \code{NULL}
 (default), all unique values of \code{data[[survey_col]]} are used.}
@@ -73,6 +83,10 @@ survey-specific grids by spatial filtering.}
 \item{survey_col}{Character. Column identifying the survey series. Default
 \code{"cruiseseries"}.}
 
+\item{xy_cols}{Character vector of the coordinate columns in \code{data} and
+\code{newdata}. Only used when \code{compiled_model = NULL}; otherwise taken from
+the model mesh. Default \code{c("X", "Y")}.}
+
 \item{bias_correct}{Logical. Apply bias correction? Default \code{FALSE}.}
 
 \item{level}{Numeric. Confidence level for index intervals. Default \code{0.95}.}
@@ -85,7 +99,9 @@ survey-specific grids by spatial filtering.}
 \item{nsplit}{Integer. Number of splits for \code{\link[sdmTMB:get_index_split]{sdmTMB::get_index_split()}}.
 Default \code{3}.}
 
-\item{n_workers}{Integer. Number of parallel workers. Default \code{1}.}
+\item{n_workers}{Integer. Number of parallel workers. Default \code{1}, which
+uses whatever \code{\link[future:plan]{future::plan()}} is currently set. Values \verb{> 1} set a
+temporary \code{future::multisession} plan.}
 
 \item{future_seed}{Logical or integer. Future-compatible random seed.}
 

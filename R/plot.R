@@ -69,7 +69,7 @@ plot_mesh <- function(
     coords = c("X", "Y"), crs = suppressWarnings(sf::st_crs(crs))
   )
 
-  p <- ggOceanMaps::basemap(nodes_sf, crs = mesh_crs, base_size = base_size)
+  p <- .basemap(nodes_sf, crs = mesh_crs, base_size = base_size)
 
   if (!is.null(data)) {
     aes_pts <- if (!is.null(value)) {
@@ -201,7 +201,7 @@ plot_prediction_map <- function(
     remove = FALSE
   )
 
-  p <- ggOceanMaps::basemap(d_sf, crs = crs, base_size = base_size) +
+  p <- .basemap(d_sf, crs = crs, base_size = base_size) +
     ggplot2::geom_raster(
       data = d_sf,
       ggplot2::aes(x = .data$.X, y = .data$.Y, fill = .data$value)
@@ -296,7 +296,7 @@ plot_random_field <- function(
     remove = FALSE
   )
 
-  p <- ggOceanMaps::basemap(d_sf, crs = crs, base_size = base_size) +
+  p <- .basemap(d_sf, crs = crs, base_size = base_size) +
     ggplot2::geom_raster(
       data = d_sf,
       ggplot2::aes(x = .data$.X, y = .data$.Y, fill = .data$value)

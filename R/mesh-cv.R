@@ -9,11 +9,18 @@
 #' footing.
 #'
 #' This is a parameterised version of an exploratory workflow: all model
-#' settings are inherited from the fitted `object`, and nothing about the data
-#' is assumed beyond the coordinate and response columns.
+#' settings are inherited from the original call of the fitted `object` (as
+#' with [sdmTMB::update.sdmTMB()]), and nothing about the data is assumed
+#' beyond the coordinate and response columns.
 #'
-#' @param object A fitted [sdmTMB::sdmTMB()] model. Model settings (formula,
-#'   family, spatial and spatiotemporal structure, time column) are inherited.
+#' The summed hold-out log-likelihood (`sum_loglik`) is the headline metric.
+#' AIC (`mean_aic`, `deltaAIC`) is reported as a rough guide only: AIC values
+#' of models fitted with different meshes are not strictly comparable, since
+#' each mesh is a different approximation of the random fields.
+#'
+#' @param object A fitted [sdmTMB::sdmTMB()] model. All model settings
+#'   (formula, family, spatial and spatiotemporal structure, time column,
+#'   offset, weights, priors, etc.) are inherited.
 #' @param mesh_cutoffs Numeric vector of mesh cutoff values to compare.
 #' @param k Integer. Number of cross-validation folds. Default `3`.
 #' @param block_size Numeric. Spatial block size in CRS units (e.g. metres). If
@@ -29,14 +36,16 @@
 #'   model mesh.
 #' @param control An [sdmTMB::sdmTMBcontrol()] object for the CV fits. If `NULL`,
 #'   inherited from `object`.
-#' @param n_workers Integer. Number of parallel workers. Default `1`.
+#' @param n_workers Integer. Number of parallel workers. Default `1`, which
+#'   uses whatever [future::plan()] is currently set. Values `> 1` set a
+#'   temporary `future::multisession` plan.
 #' @param future_seed Logical or integer. Future-compatible random seed.
 #' @param silent Logical. Suppress fitting output? Default `TRUE`.
 #'
 #' @return A data frame (tibble) of class `sdmTMB_mesh_cv` with one row per
 #'   cutoff: `cutoff`, `crashed`, `converged`, `sanity`, `sum_loglik` (the
 #'   summed hold-out log-likelihood from [sdmTMB::sdmTMB_cv()]; higher is
-#'   better), `mean_aic`, and the derived `deltaNLL`, `deltaNLL_pr`,
+#'   better), `mean_aic` (a rough guide only; see Description), and the derived `deltaNLL`, `deltaNLL_pr`,
 #'   `deltaAIC`, `deltaAIC_pr`. `deltaNLL`/`deltaAIC` are relative to the
 #'   best-fitting cutoff (`0` = best; lower is better, mirroring AIC). The
 #'   list of [sdmTMB::sdmTMB_cv()] objects is attached as the `"cv"`
@@ -92,13 +101,19 @@ sdmTMB_mesh_cv <- function(
     }
     object_crs <- sf::st_crs(object$spde$mesh$crs)
   }
-  if (is.null(control)) control <- object$control
-
-  model_formula <- if (length(object$formula) > 1) {
-    object$formula
+  # Evaluated on the main process so the arguments reach the workers
+  cv_args <- if (is.null(control)) {
+    .refit_args(object)
   } else {
-    object$formula[[1]]
+    .refit_args(object, control = control)
   }
+  # sdmTMB_cv() requires the offset as a column name
+  if (is.numeric(cv_args$offset)) {
+    dt[[".sdmTMBexperiments_offset"]] <- cv_args$offset
+    cv_args$offset <- ".sdmTMBexperiments_offset"
+  }
+
+  model_formula <- cv_args$formula
   if (is.null(response)) {
     response <- all.vars(if (is.list(model_formula)) model_formula[[1]] else model_formula)[1]
   }
@@ -132,27 +147,23 @@ sdmTMB_mesh_cv <- function(
     progress = FALSE, report = FALSE, plot = FALSE
   )
 
-  old_plan <- .setup_parallel(n_workers)
-  on.exit(future::plan(old_plan), add = TRUE)
+  old_parallel <- .setup_parallel(n_workers)
+  on.exit(.restore_parallel(old_parallel), add = TRUE)
 
   # Cross-validated fits per mesh ---------------------------------------------
   mcvs <- future.apply::future_lapply(
     seq_along(meshes),
     function(j) {
-      try(
-        sdmTMB::sdmTMB_cv(
-          formula = model_formula,
-          data = dt,
-          mesh = meshes[[j]],
-          time = object$time,
-          family = object$family,
-          spatial = lapply(object$spatial, function(g) g),
-          spatiotemporal = lapply(object$spatiotemporal, function(g) g),
-          control = control,
-          fold_ids = cvb$folds_ids
-        ),
-        silent = TRUE
-      )
+      args <- cv_args
+      args$data <- dt
+      args$mesh <- meshes[[j]]
+      args$fold_ids <- cvb$folds_ids
+      out <- try(do.call(sdmTMB::sdmTMB_cv, args), silent = TRUE)
+      if (inherits(out, "try-error")) {
+        message("Cross-validation for cutoff ", names(meshes)[j],
+                " failed with error: ", conditionMessage(attr(out, "condition")))
+      }
+      out
     },
     future.seed = future_seed
   )

@@ -4,8 +4,11 @@
 #' Runs an analytical retrospective on an index from [sdmTMB::sdmTMB()]. The
 #' function refits the model for each peel (successively dropping the most recent
 #' years) and calculates an index for each peel using
-#' [sdmTMB::get_index_split()]. Model settings are inherited from the fitted
-#' `object`.
+#' [sdmTMB::get_index_split()]. All model settings are inherited from the
+#' original call of the fitted `object` (as with [sdmTMB::update.sdmTMB()]);
+#' only `data` and `mesh` are replaced. Arguments of the original call are
+#' evaluated in the environment of the model formula, so objects referenced
+#' there (e.g. `priors = my_priors`) must still exist.
 #'
 #' @param object A fitted model from [sdmTMB::sdmTMB()].
 #' @param newdata A data frame to make predictions on, with the same predictor
@@ -16,8 +19,11 @@
 #'   including the terminal (most recent) year. Clamped to the number of fitted
 #'   years available.
 #' @param refit_meshes Logical. Rebuild the mesh for each peel from the peeled
-#'   data (approximating the original cutoff)? If `FALSE` (default) the original
-#'   model mesh is reused unchanged.
+#'   data using `cutoff`? If `FALSE` (default) the original model mesh is reused
+#'   unchanged.
+#' @param cutoff Numeric. Mesh cutoff (in model coordinate units) used to
+#'   rebuild the meshes when `refit_meshes = TRUE`. Required in that case, since
+#'   the original cutoff is not stored in the fitted model.
 #' @param bias_correct Logical. Apply bias correction via [TMB::sdreport()]?
 #'   Recommended `TRUE` for final analyses, `FALSE` (default) while
 #'   experimenting.
@@ -28,8 +34,10 @@
 #' @param save_models Logical. Retain the fitted model object for each peel in
 #'   the output?
 #' @param silent Logical. Suppress model fitting output?
-#' @param n_workers Integer. Number of parallel workers. Defaults to `nyears`.
-#'   Set to 1 to run sequentially.
+#' @param n_workers Integer. Number of parallel workers. Default `1`, which
+#'   uses whatever [future::plan()] is currently set (sequential by default).
+#'   Values `> 1` set a temporary `future::multisession` plan with that many
+#'   workers.
 #' @param nsplit Integer. Number of splits for [sdmTMB::get_index_split()].
 #' @param predict_args A list of arguments controlling the prediction grid used
 #'   for the index. Currently `newdata` is filtered to the peeled years.
@@ -63,12 +71,13 @@ sdmTMB_retro <- function(
   newdata,
   nyears = 5,
   refit_meshes = FALSE,
+  cutoff = NULL,
   bias_correct = FALSE,
   level = 0.95,
   area = 1,
   save_models = FALSE,
   silent = TRUE,
-  n_workers = nyears,
+  n_workers = 1,
   nsplit = 3,
   predict_args = list(),
   future_seed = TRUE
@@ -76,28 +85,32 @@ sdmTMB_retro <- function(
   if (!inherits(object, "sdmTMB")) {
     stop("`object` must be a fitted sdmTMB model.")
   }
+  if (refit_meshes && is.null(cutoff)) {
+    stop("`cutoff` must be supplied when `refit_meshes = TRUE`.")
+  }
 
   fitted_years <- sort(unique(object$fitted_time))
   # Guard against nyears exceeding the number of available years (avoids NA).
   nyears <- min(nyears, length(fitted_years))
   years <- rev(fitted_years)[seq_len(nyears)]
 
-  old_plan <- .setup_parallel(n_workers)
-  on.exit(future::plan(old_plan), add = TRUE)
+  # Evaluated on the main process so the arguments reach the workers
+  refit_args <- .refit_args(object)
+
+  old_parallel <- .setup_parallel(n_workers)
+  on.exit(.restore_parallel(old_parallel), add = TRUE)
 
   peeled_output <- future.apply::future_lapply(
     years,
     function(k) {
-      peel_data <- dplyr::filter(object$data, get(object$time) <= k)
+      rows <- object$data[[object$time]] <= k
+      peel_data <- object$data[rows, , drop = FALSE]
 
       if (refit_meshes) {
-        if (is.integer(future_seed)) set.seed(future_seed)
-        knots <- object$spde$mesh$loc[, 1:2]
-        approx_cutoff <- round(min(stats::dist(knots)), 0)
         mesh <- sdmTMB::make_mesh(
           peel_data,
-          xy_cols = c("X", "Y"),
-          cutoff = approx_cutoff
+          xy_cols = object$spde$xy_cols,
+          cutoff = cutoff
         )
       } else {
         # Reuse the original mesh geometry (SPDE vertices/triangulation)
@@ -119,27 +132,13 @@ sdmTMB_retro <- function(
         dplyr::filter(get(object$time) %in% unique(object$data[[object$time]]))
 
       out <- try(
-        sdmTMB::sdmTMB(
-          formula = if (length(object$formula) > 1) {
-            object$formula
-          } else {
-            object$formula[[1]]
-          },
-          data = peel_data,
-          mesh = mesh,
-          time = object$time,
-          offset = object$offset[object$data[[object$time]] <= k],
-          family = object$family,
-          spatial = lapply(object$spatial, function(g) g),
-          spatiotemporal = lapply(object$spatiotemporal, function(g) g),
-          control = object$control,
-          silent = silent
-        ),
+        .refit(refit_args, data = peel_data, mesh = mesh, rows = rows,
+               silent = silent),
         silent = silent
       )
 
+      .report_fit(out, k)
       if (inherits(out, "try-error")) {
-        message("Model for ", k, " did not converge. Adding NAs as index values")
         index <- .crashed_index(unique(predict_args$newdata[[object$time]]))
       } else {
         index <- .safe_index(
