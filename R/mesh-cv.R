@@ -63,7 +63,7 @@
 #'   data = sdmTMB::pcod, formula = density ~ 0 + as.factor(year),
 #'   time = "year", mesh = mesh, family = sdmTMB::tweedie(link = "log")
 #' )
-#' cv <- sdmTMB_mesh_cv(fit, mesh_cutoffs = c(15, 30), k = 3)
+#' cv <- sdmTMB_mesh_cv(fit, mesh_cutoffs = c(15, 30), k = 3, object_crs = 32609)
 #' cv
 #' plot(cv)
 #' }
@@ -234,7 +234,7 @@ sdmTMB_mesh_cv <- function(
 #'   data = sdmTMB::pcod, formula = density ~ 0 + as.factor(year),
 #'   time = "year", mesh = mesh, family = sdmTMB::tweedie(link = "log")
 #' )
-#' cv <- sdmTMB_mesh_cv(fit, mesh_cutoffs = c(15, 30), k = 3)
+#' cv <- sdmTMB_mesh_cv(fit, mesh_cutoffs = c(15, 30), k = 3, object_crs = 32609)
 #' plot(cv)
 #' plot(cv, metric = "deltaAIC")
 #' }
