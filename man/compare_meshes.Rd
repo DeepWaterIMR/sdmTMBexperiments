@@ -9,6 +9,7 @@ compare_meshes(
   mesh_cutoffs,
   newdata,
   object_crs = NULL,
+  coord_multiplier = 1000,
   bias_correct = FALSE,
   level = 0.95,
   area = 1,
@@ -32,6 +33,10 @@ the model's coordinate columns (\code{object$spde$xy_cols}).}
 
 \item{object_crs}{Coordinate reference system for the model data. If \code{NULL}
 (default), extracted from the model's mesh.}
+
+\item{coord_multiplier}{Numeric factor to convert the model coordinates to
+CRS units for the spatial maps. Default \code{1000} (coordinates in km, CRS in
+m); use \code{1} for coordinates already in CRS units.}
 
 \item{bias_correct}{Logical. Apply bias correction via \code{\link[TMB:sdreport]{TMB::sdreport()}}?
 Default \code{FALSE}.}
@@ -61,8 +66,9 @@ Default \code{"Reference"}.}
 }
 \value{
 An object of class \code{sdmTMB_mesh_comparison}, a list with \code{index},
-\code{pred_diff} (and optionally \code{models}). Coordinates in \code{pred_diff} are
-returned as \code{X} and \code{Y} columns. Carries \code{crs} and \code{reference_name}
+\code{pred_diff} (and optionally \code{models}). The time column of \code{index} is
+always named \code{year}. Coordinates in \code{pred_diff} are returned as \code{X} and
+\code{Y} columns. Carries \code{crs}, \code{coord_multiplier} and \code{reference_name}
 attributes.
 }
 \description{
@@ -71,6 +77,11 @@ resulting survey indices and predictions to the original (reference) model.
 Useful for assessing the sensitivity of an index to mesh resolution. All
 model settings are inherited from the original call of the fitted \code{object}
 (as with \code{\link[sdmTMB:update.sdmTMB]{sdmTMB::update.sdmTMB()}}); only \code{mesh} is replaced.
+}
+\details{
+The alternative meshes are built with \code{\link[sdmTMB:make_mesh]{sdmTMB::make_mesh()}}. If \code{object}
+uses a barrier mesh, the alternatives have no barrier and a warning is
+given, since the comparison then mixes cutoff and barrier effects.
 }
 \examples{
 \donttest{

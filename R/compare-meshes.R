@@ -15,6 +15,9 @@
 #'   the model's coordinate columns (`object$spde$xy_cols`).
 #' @param object_crs Coordinate reference system for the model data. If `NULL`
 #'   (default), extracted from the model's mesh.
+#' @param coord_multiplier Numeric factor to convert the model coordinates to
+#'   CRS units for the spatial maps. Default `1000` (coordinates in km, CRS in
+#'   m); use `1` for coordinates already in CRS units.
 #' @param bias_correct Logical. Apply bias correction via [TMB::sdreport()]?
 #'   Default `FALSE`.
 #' @param level Numeric. Confidence level for index intervals. Default `0.95`.
@@ -34,9 +37,15 @@
 #'   Default `"Reference"`.
 #'
 #' @return An object of class `sdmTMB_mesh_comparison`, a list with `index`,
-#'   `pred_diff` (and optionally `models`). Coordinates in `pred_diff` are
-#'   returned as `X` and `Y` columns. Carries `crs` and `reference_name`
+#'   `pred_diff` (and optionally `models`). The time column of `index` is
+#'   always named `year`. Coordinates in `pred_diff` are returned as `X` and
+#'   `Y` columns. Carries `crs`, `coord_multiplier` and `reference_name`
 #'   attributes.
+#'
+#' @details
+#' The alternative meshes are built with [sdmTMB::make_mesh()]. If `object`
+#' uses a barrier mesh, the alternatives have no barrier and a warning is
+#' given, since the comparison then mixes cutoff and barrier effects.
 #'
 #' @author Mikko Vihtakari
 #' @seealso [sdmTMB::sdmTMB()], [sdmTMB::get_index_split()],
@@ -63,6 +72,7 @@ compare_meshes <- function(
   mesh_cutoffs,
   newdata,
   object_crs = NULL,
+  coord_multiplier = 1000,
   bias_correct = FALSE,
   level = 0.95,
   area = 1,
@@ -94,6 +104,8 @@ compare_meshes <- function(
     }
     object_crs <- sf::st_crs(mesh_crs)
   }
+
+  .warn_barrier_dropped(object$spde, "the alternative cutoff meshes")
 
   # Evaluated on the main process so the arguments reach the workers
   refit_args <- .refit_args(object)
@@ -143,7 +155,7 @@ compare_meshes <- function(
         .data$cutoff,
         levels = unique(c(
           reference_name,
-          sort(suppressWarnings(as.integer(unique(.data$cutoff))))
+          sort(suppressWarnings(as.numeric(unique(.data$cutoff))))
         ))
       )
     )
@@ -151,13 +163,18 @@ compare_meshes <- function(
   # Prediction grid differences ----------------------------------------------
   ref_mod <- mmods[[reference_name]]
   alt <- mmods[!names(mmods) %in% reference_name]
+  ref_failed <- inherits(ref_mod, "try-error")
+  if (ref_failed) {
+    warning("The reference model refit failed, so no prediction differences ",
+            "can be computed.", call. = FALSE)
+  }
 
   pred_diff <- future.apply::future_lapply(
     seq_along(alt),
     function(i) {
       k <- alt[[i]]
       cutoff_name <- names(alt)[i]
-      if (inherits(k, "try-error")) {
+      if (ref_failed || inherits(k, "try-error")) {
         return(data.frame(
           cutoff = cutoff_name, year = newdata[[object$time]],
           X = newdata[[xy_cols[1]]], Y = newdata[[xy_cols[2]]],
@@ -188,6 +205,7 @@ compare_meshes <- function(
   }
   class(out) <- "sdmTMB_mesh_comparison"
   attributes(out)$crs <- object_crs
+  attributes(out)$coord_multiplier <- coord_multiplier
   attributes(out)$reference_name <- reference_name
   out
 }
@@ -196,8 +214,9 @@ compare_meshes <- function(
 #'
 #' @description
 #' Plots survey index time series from a mesh cutoff comparison (reference in
-#' black, alternative cutoffs in colour, with Mohn's rho annotated), or spatial
-#' maps of prediction differences on a [ggOceanMaps::basemap()].
+#' black, alternative cutoffs in colour, optionally annotated with the
+#' terminal-year relative difference), or spatial maps of prediction
+#' differences on a [ggOceanMaps::basemap()].
 #'
 #' @details
 #' For `type = "spatial"`, each grid cell is compared between a model fitted
@@ -225,8 +244,10 @@ compare_meshes <- function(
 #' @param type Character. `"index"` (default) or `"spatial"`.
 #' @param index_divisor Optional numeric divisor applied to index values.
 #' @param unit Character. Unit label. If `NA`, `"Index value"` is used.
-#' @param mohn Logical. Annotate the index plot with Mohn's rho (via
-#'   [mohns_rho()])? Default `FALSE`. Only applies when `type = "index"`.
+#' @param mohn Logical. Annotate the index plot with the mean terminal-year
+#'   relative difference from the reference (computed with [mohns_rho()])?
+#'   Default `FALSE`. Only applies when `type = "index"`. All series share the
+#'   same final year here, so this is not a retrospective Mohn's rho.
 #' @param cutoff_label Character. Label for the cutoff colour/fill legend.
 #'   Default `"Cutoff"`.
 #' @param viridis Logical. Use the viridis palette for cutoff levels? If `FALSE`
@@ -311,7 +332,11 @@ plot.sdmTMB_mesh_comparison <- function(
     if (isTRUE(mohn)) {
       rho <- mohns_rho(dat, group_col = "cutoff",
                        reference = attributes(x)$reference_name)
-      rho_lab <- data.frame(label = paste("Mohn's rho = ", round(rho, 3)))
+      # Every series ends in the same year, so this is the (mean) relative
+      # difference in the terminal year, not a retrospective Mohn's rho
+      rho_lab <- data.frame(
+        label = paste("Terminal-year rel. diff. =", round(rho, 3))
+      )
       p <- p + ggplot2::geom_text(
         data = rho_lab, ggplot2::aes(-Inf, Inf, label = .data$label),
         vjust = 2, hjust = -0.25, size = base_size / 2.845276,
@@ -342,6 +367,7 @@ plot.sdmTMB_mesh_comparison <- function(
           transform_color_scale = transform_color_scale,
           limit_rounding = limit_rounding, break_rounding = break_rounding,
           base_size = base_size,
+          coord_multiplier = .coord_multiplier(x),
           title = paste("Cutoff:", names(x$pred_diff)[i], "vs",
                         attributes(x)$reference_name)
         )

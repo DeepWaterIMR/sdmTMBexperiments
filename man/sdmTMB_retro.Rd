@@ -35,7 +35,8 @@ years available.}
 
 \item{refit_meshes}{Logical. Rebuild the mesh for each peel from the peeled
 data using \code{cutoff}? If \code{FALSE} (default) the original model mesh is reused
-unchanged.}
+unchanged, including any barrier. Rebuilt meshes have no barrier (a
+warning is given if the original mesh has one).}
 
 \item{cutoff}{Numeric. Mesh cutoff (in model coordinate units) used to
 rebuild the meshes when \code{refit_meshes = TRUE}. Required in that case, since
@@ -63,8 +64,10 @@ workers.}
 
 \item{nsplit}{Integer. Number of splits for \code{\link[sdmTMB:get_index_split]{sdmTMB::get_index_split()}}.}
 
-\item{predict_args}{A list of arguments controlling the prediction grid used
-for the index. Currently \code{newdata} is filtered to the peeled years.}
+\item{predict_args}{A list of extra arguments passed to
+\code{\link[sdmTMB:predict.sdmTMB]{sdmTMB::predict.sdmTMB()}} when calculating each peel's index (the
+\code{predict_args} argument of \code{\link[sdmTMB:get_index_split]{sdmTMB::get_index_split()}}), e.g.
+\code{list(re_form_iid = NA)}.}
 
 \item{future_seed}{Logical or integer. Future-compatible random seed for
 parallel processing. See \code{\link[future.apply:future_lapply]{future.apply::future_lapply()}}.}

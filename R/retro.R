@@ -20,7 +20,8 @@
 #'   years available.
 #' @param refit_meshes Logical. Rebuild the mesh for each peel from the peeled
 #'   data using `cutoff`? If `FALSE` (default) the original model mesh is reused
-#'   unchanged.
+#'   unchanged, including any barrier. Rebuilt meshes have no barrier (a
+#'   warning is given if the original mesh has one).
 #' @param cutoff Numeric. Mesh cutoff (in model coordinate units) used to
 #'   rebuild the meshes when `refit_meshes = TRUE`. Required in that case, since
 #'   the original cutoff is not stored in the fitted model.
@@ -39,8 +40,10 @@
 #'   Values `> 1` set a temporary `future::multisession` plan with that many
 #'   workers.
 #' @param nsplit Integer. Number of splits for [sdmTMB::get_index_split()].
-#' @param predict_args A list of arguments controlling the prediction grid used
-#'   for the index. Currently `newdata` is filtered to the peeled years.
+#' @param predict_args A list of extra arguments passed to
+#'   [sdmTMB::predict.sdmTMB()] when calculating each peel's index (the
+#'   `predict_args` argument of [sdmTMB::get_index_split()]), e.g.
+#'   `list(re_form_iid = NA)`.
 #' @param future_seed Logical or integer. Future-compatible random seed for
 #'   parallel processing. See [future.apply::future_lapply()].
 #'
@@ -88,6 +91,8 @@ sdmTMB_retro <- function(
   if (refit_meshes && is.null(cutoff)) {
     stop("`cutoff` must be supplied when `refit_meshes = TRUE`.")
   }
+  if (refit_meshes) .warn_barrier_dropped(object$spde, "the rebuilt peel meshes")
+  .subset_area(area, TRUE, nrow(newdata)) # validate the length
 
   fitted_years <- sort(unique(object$fitted_time))
   # Guard against nyears exceeding the number of available years (avoids NA).
@@ -125,11 +130,14 @@ sdmTMB_retro <- function(
           xy_cols = object$spde$xy_cols,
           mesh = object$spde$mesh
         )
+        # Same triangulation, so the original barrier still applies
+        mesh <- .copy_barrier(mesh, object$spde)
       }
 
-      predict_args$newdata <- newdata |>
-        dplyr::filter(get(object$time) <= k) |>
-        dplyr::filter(get(object$time) %in% unique(object$data[[object$time]]))
+      nd_time <- newdata[[object$time]]
+      keep <- nd_time <= k & nd_time %in% unique(object$data[[object$time]])
+      peel_newdata <- newdata[keep, , drop = FALSE]
+      peel_area <- .subset_area(area, keep, nrow(newdata))
 
       out <- try(
         .refit(refit_args, data = peel_data, mesh = mesh, rows = rows,
@@ -139,12 +147,12 @@ sdmTMB_retro <- function(
 
       .report_fit(out, k)
       if (inherits(out, "try-error")) {
-        index <- .crashed_index(unique(predict_args$newdata[[object$time]]))
+        index <- .crashed_index(unique(peel_newdata[[object$time]]))
       } else {
         index <- .safe_index(
-          mod = out, newdata = predict_args$newdata, time_col = object$time,
+          mod = out, newdata = peel_newdata, time_col = object$time,
           nsplit = nsplit, bias_correct = bias_correct, level = level,
-          area = area, silent = silent
+          area = peel_area, silent = silent, predict_args = predict_args
         )
       }
 
@@ -207,7 +215,9 @@ plot.sdmTMB_retro <- function(
   dat <- lapply(seq_along(x), function(i) {
     dplyr::mutate(x[[i]]$index, peel = names(x)[i], .before = 1)
   }) |>
-    dplyr::bind_rows()
+    dplyr::bind_rows() |>
+    # in peel order, not alphabetical ("peel 10" would sort before "peel 2")
+    dplyr::mutate(peel = factor(.data$peel, levels = names(x)))
 
   if (!is.null(index_divisor)) {
     dat <- dplyr::mutate(

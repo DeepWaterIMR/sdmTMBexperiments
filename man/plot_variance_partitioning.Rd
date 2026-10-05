@@ -15,10 +15,27 @@ plot_variance_partitioning(fit, base_size = 11)
 A \code{ggplot} object.
 }
 \description{
-Partitions the link-scale variance of a fitted sdmTMB model among its random
-components (spatial field \code{sigma_O}, spatiotemporal field \code{sigma_E}, smooth
-terms, and observation error \code{phi}) using \code{\link[sdmTMB:tidy]{sdmTMB::tidy()}}, and plots the
-proportion of variance explained by each.
+Partitions the link-scale variance of a fitted sdmTMB model among its
+random components using \code{\link[sdmTMB:tidy]{sdmTMB::tidy()}}, and plots the proportion of that
+variance from each. This is an approximate, descriptive summary, not a
+formal variance decomposition.
+}
+\details{
+Only components whose standard deviation is a marginal SD on the link scale
+are included:
+\itemize{
+\item the spatial field (\code{sigma_O}) and spatiotemporal field (\code{sigma_E});
+\item random intercepts (\code{sd__(Intercept)}, one per grouping factor);
+\item observation error, only for a \code{gaussian()} family with an identity link
+or a \code{lognormal()} family, where \code{phi} is an SD on the link scale.
+}
+
+Left out are observation error for other families (for e.g. Tweedie, Gamma
+or NB2, \code{phi} is a dispersion or shape parameter, and binomial has none),
+smooth-term SDs (\code{sd__s(...)}, the SD of penalised spline coefficients,
+not of the fitted smooth) and spatially varying coefficient SDs
+(\code{sigma_Z}, whose contribution scales with the covariate). The proportions
+are therefore of the variance of the included components only.
 }
 \examples{
 \donttest{

@@ -28,8 +28,8 @@
 #' @param response Character. Name of the response column used to build
 #'   presence/absence blocks for [blockCV::cv_spatial()]. If `NULL` (default),
 #'   taken from the model formula's left-hand side.
-#' @param xy_cols Character vector of the coordinate columns. Default
-#'   `c("X", "Y")`.
+#' @param xy_cols Character vector of the coordinate columns. If `NULL`
+#'   (default), taken from the model mesh (`object$spde$xy_cols`).
 #' @param coord_multiplier Numeric factor to convert `xy_cols` to CRS units.
 #'   Default `1000`.
 #' @param object_crs Coordinate reference system. If `NULL`, taken from the
@@ -74,7 +74,7 @@ sdmTMB_mesh_cv <- function(
   k = 3,
   block_size = NULL,
   response = NULL,
-  xy_cols = c("X", "Y"),
+  xy_cols = NULL,
   coord_multiplier = 1000,
   object_crs = NULL,
   control = NULL,
@@ -89,6 +89,7 @@ sdmTMB_mesh_cv <- function(
     stop("Package 'blockCV' is required for sdmTMB_mesh_cv().")
   }
 
+  if (is.null(xy_cols)) xy_cols <- object$spde$xy_cols
   dt <- object$data
   if (!all(xy_cols %in% names(dt))) {
     stop("The model data must contain the coordinate columns ",
@@ -96,11 +97,15 @@ sdmTMB_mesh_cv <- function(
   }
 
   if (is.null(object_crs)) {
-    if (is.null(object$spde$mesh$crs)) {
+    mesh_crs <- object$spde$mesh$crs
+    # make_mesh() has no `crs` argument, so a mesh built the usual way
+    # carries an NA (not NULL) crs; catch both.
+    if (is.null(mesh_crs) || is.na(sf::st_crs(mesh_crs))) {
       stop("Model CRS not found in the mesh object. Specify `object_crs`.")
     }
-    object_crs <- sf::st_crs(object$spde$mesh$crs)
+    object_crs <- sf::st_crs(mesh_crs)
   }
+  .warn_barrier_dropped(object$spde, "the cross-validation meshes")
   # Evaluated on the main process so the arguments reach the workers
   cv_args <- if (is.null(control)) {
     .refit_args(object)
@@ -173,13 +178,13 @@ sdmTMB_mesh_cv <- function(
   tab <- lapply(seq_along(mcvs), function(i) {
     if (inherits(mcvs[[i]], "try-error")) {
       tibble::tibble(
-        cutoff = as.integer(names(mcvs)[i]), crashed = TRUE,
+        cutoff = as.numeric(names(mcvs)[i]), crashed = TRUE,
         converged = FALSE, sanity = FALSE, sum_loglik = NA_real_,
         mean_aic = NA_real_
       )
     } else {
       tibble::tibble(
-        cutoff = as.integer(names(mcvs)[i]),
+        cutoff = as.numeric(names(mcvs)[i]),
         crashed = FALSE,
         converged = isTRUE(mcvs[[i]]$converged),
         sanity = all(vapply(

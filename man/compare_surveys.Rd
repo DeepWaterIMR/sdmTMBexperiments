@@ -20,6 +20,7 @@ compare_surveys(
   offset_col = NULL,
   survey_col = "cruiseseries",
   xy_cols = c("X", "Y"),
+  coord_multiplier = 1000,
   bias_correct = FALSE,
   level = 0.95,
   area = 1,
@@ -38,7 +39,9 @@ identifying the survey series (see \code{survey_col}) and coordinate columns
 (see \code{xy_cols}).}
 
 \item{compiled_index}{A data frame of the compiled reference index, with
-columns \code{year}, \code{est}, \code{lwr}, \code{upr}, \code{se}.}
+columns \code{year}, \code{est}, \code{lwr}, \code{upr}, \code{se}. A time column named after
+\code{compiled_model$time} (as returned by \code{\link[sdmTMB:get_index_split]{sdmTMB::get_index_split()}}) is
+renamed to \code{year}.}
 
 \item{compiled_model}{A fitted \code{\link[sdmTMB:sdmTMB]{sdmTMB::sdmTMB()}} model for the compiled
 index, or \code{NULL} (default). When provided, all settings of its original
@@ -87,11 +90,18 @@ survey-specific grids by spatial filtering.}
 \code{newdata}. Only used when \code{compiled_model = NULL}; otherwise taken from
 the model mesh. Default \code{c("X", "Y")}.}
 
+\item{coord_multiplier}{Numeric factor to convert \code{xy_cols} to CRS units,
+used to build and clip to the survey footprints and to draw the spatial
+maps. Default \code{1000} (coordinates in km, CRS in m); use \code{1} for
+coordinates already in CRS units.}
+
 \item{bias_correct}{Logical. Apply bias correction? Default \code{FALSE}.}
 
 \item{level}{Numeric. Confidence level for index intervals. Default \code{0.95}.}
 
-\item{area}{Grid cell area for index calculation. Passed to
+\item{area}{Grid cell area for index calculation: a single value, a column
+name in \code{newdata}, or a numeric vector with one value per row of
+\code{newdata} (subset to each survey's clipped grid). Passed to
 \code{\link[sdmTMB:get_index_split]{sdmTMB::get_index_split()}}.}
 
 \item{silent}{Logical. Suppress model output? Default \code{TRUE}.}
@@ -116,7 +126,8 @@ Default \code{TRUE}.}
 }
 \value{
 An object of class \code{sdmTMB_survey_comparison}, a list with \code{sanity},
-\code{index} and \code{grid}. Carries \code{crs}, \code{reference_label} and \code{surveys}
+\code{index} and \code{grid}. The time column of \code{index} is always named \code{year}.
+Carries \code{crs}, \code{coord_multiplier}, \code{reference_label} and \code{surveys}
 attributes.
 }
 \description{

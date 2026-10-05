@@ -28,6 +28,50 @@
 - Coordinate columns are no longer assumed to be `X`/`Y`: fitted models use
   `object$spde$xy_cols`, and `compare_surveys()` gains an `xy_cols` argument
   for `compiled_model = NULL`.
+- `compare_surveys()` no longer returns a garbled `sanity` table when one
+  survey model fails to fit; failed fits get a column of `NA`s with the same
+  checks as the others.
+- `plot.sdmTMB_model_comparison()` now always draws the reference model in
+  black, whatever the model names or `reference_model`. Index plots no longer
+  give `NA` colours with more than seven series.
+- Non-integer mesh cutoffs (e.g. `7.5`) are no longer truncated or turned into
+  `NA` by `compare_meshes()` and `sdmTMB_mesh_cv()`.
+- `compare_meshes()` no longer errors when the reference refit fails; it warns
+  and returns `NA` prediction differences.
+- `sdmTMB_retro()` and `compare_surveys()` now accept a numeric `area` vector
+  with one value per row of `newdata`, subsetting it along with the
+  prediction grid.
+- Models with a time column not named `year` now work: index outputs always
+  name their time column `year`, so plots, `mohns_rho()` and failed-fit rows
+  line up.
+- `compare_surveys()`, `compare_models()` and `compare_meshes()` gain a
+  `coord_multiplier` argument (default `1000`, km to m), used for survey
+  footprint clipping and the spatial maps, which previously assumed km.
+- `sdmTMB_mesh_cv()` now takes its default `xy_cols` from the model mesh and
+  errors clearly on the `NA` CRS that `make_mesh()` produces.
+- `sdmTMB_retro(refit_meshes = FALSE)` now keeps a barrier mesh's barrier.
+  `compare_meshes()`, `compare_surveys()`, `sdmTMB_mesh_cv()` and
+  `sdmTMB_retro(refit_meshes = TRUE)` warn that the meshes they build have no
+  barrier.
+- `plot_variance_partitioning()` now only uses components whose SD is a
+  link-scale SD: `sigma_O`, `sigma_E`, random intercepts, and `phi` only for
+  `gaussian()` (identity link) and `lognormal()`. Previously it added `phi`
+  for any family (a dispersion or shape parameter for e.g. Tweedie, Gamma
+  and NB2) and smooth-term SDs, which are not link-scale variances.
+- The index-plot annotation of `plot.sdmTMB_model_comparison()` and
+  `plot.sdmTMB_mesh_comparison()` (`mohn = TRUE`) is now labelled
+  "Terminal-year rel. diff.": all series there end in the same year, so it is
+  not a retrospective Mohn's rho.
+- `plot_prediction_histogram()` divides the observed response by
+  `exp(offset)` for models with an offset, so it is on the same scale as the
+  offset-free grid predictions.
+- `sdmTMB_retro()`'s `predict_args` is now passed on to
+  `sdmTMB::get_index_split()`; it previously had no effect.
+- `plot.sdmTMB_retro()` keeps peels in order with more than ten peels.
+- `plot.sdmTMB_survey_comparison(type = "scatter")` no longer errors for a
+  survey with a flat index, and no longer warns about `.data` in tidyselect.
+- The deprecated `trans` argument of ggplot2 scales is replaced with
+  `transform`; ggplot2 >= 3.5.0 is now required.
 - Failed fits now report the actual error instead of "did not converge", and
   fits that ran but fail `sdmTMB::sanity()` are flagged.
 

@@ -11,7 +11,9 @@
 #'   identifying the survey series (see `survey_col`) and coordinate columns
 #'   (see `xy_cols`).
 #' @param compiled_index A data frame of the compiled reference index, with
-#'   columns `year`, `est`, `lwr`, `upr`, `se`.
+#'   columns `year`, `est`, `lwr`, `upr`, `se`. A time column named after
+#'   `compiled_model$time` (as returned by [sdmTMB::get_index_split()]) is
+#'   renamed to `year`.
 #' @param compiled_model A fitted [sdmTMB::sdmTMB()] model for the compiled
 #'   index, or `NULL` (default). When provided, all settings of its original
 #'   call (as with [sdmTMB::update.sdmTMB()]; e.g. family, random fields, time
@@ -47,9 +49,15 @@
 #' @param xy_cols Character vector of the coordinate columns in `data` and
 #'   `newdata`. Only used when `compiled_model = NULL`; otherwise taken from
 #'   the model mesh. Default `c("X", "Y")`.
+#' @param coord_multiplier Numeric factor to convert `xy_cols` to CRS units,
+#'   used to build and clip to the survey footprints and to draw the spatial
+#'   maps. Default `1000` (coordinates in km, CRS in m); use `1` for
+#'   coordinates already in CRS units.
 #' @param bias_correct Logical. Apply bias correction? Default `FALSE`.
 #' @param level Numeric. Confidence level for index intervals. Default `0.95`.
-#' @param area Grid cell area for index calculation. Passed to
+#' @param area Grid cell area for index calculation: a single value, a column
+#'   name in `newdata`, or a numeric vector with one value per row of
+#'   `newdata` (subset to each survey's clipped grid). Passed to
 #'   [sdmTMB::get_index_split()].
 #' @param silent Logical. Suppress model output? Default `TRUE`.
 #' @param nsplit Integer. Number of splits for [sdmTMB::get_index_split()].
@@ -66,7 +74,8 @@
 #'   Default `TRUE`.
 #'
 #' @return An object of class `sdmTMB_survey_comparison`, a list with `sanity`,
-#'   `index` and `grid`. Carries `crs`, `reference_label` and `surveys`
+#'   `index` and `grid`. The time column of `index` is always named `year`.
+#'   Carries `crs`, `coord_multiplier`, `reference_label` and `surveys`
 #'   attributes.
 #'
 #' @author Mikko Vihtakari
@@ -126,6 +135,7 @@ compare_surveys <- function(
   offset_col = NULL,
   survey_col = "cruiseseries",
   xy_cols = c("X", "Y"),
+  coord_multiplier = 1000,
   bias_correct = FALSE,
   level = 0.95,
   area = 1,
@@ -171,6 +181,7 @@ compare_surveys <- function(
       object_crs <- sf::st_crs(mesh_crs)
     }
     time_col <- compiled_model$time
+    .warn_barrier_dropped(compiled_model$spde, "the survey model meshes")
   } else {
     if (is.null(formula)) stop("`formula` must be provided when compiled_model = NULL.")
     if (is.null(family)) stop("`family` must be provided when compiled_model = NULL.")
@@ -188,6 +199,14 @@ compare_surveys <- function(
     stop("`data` and `newdata` must contain the coordinate columns ",
          paste(xy_cols, collapse = ", "), ".")
   }
+  if (time_col != "year" && time_col %in% names(compiled_index) &&
+      !"year" %in% names(compiled_index)) {
+    names(compiled_index)[names(compiled_index) == time_col] <- "year"
+  }
+  # Track grid rows through the spatial clipping so a per-row `area` vector
+  # can be subset to each survey's grid
+  newdata$.sdmTMBexperiments_row <- seq_len(nrow(newdata))
+  .subset_area(area, TRUE, nrow(newdata)) # validate the length
 
   use_cli <- isTRUE(verbose) && requireNamespace("cli", quietly = TRUE)
   step <- function(msg) if (use_cli) cli::cli_progress_step(msg, spinner = TRUE)
@@ -231,28 +250,32 @@ compare_surveys <- function(
     function(k) {
       survey_data <- if (!inherits(k$mod, "try-error")) k$mod$data else k$data
       region <- make_survey_prediction_region(
-        survey_data, crs = object_crs, xy_cols = xy_cols, concavity = concavity
+        survey_data, crs = object_crs, xy_cols = xy_cols,
+        coord_multiplier = coord_multiplier, concavity = concavity
       )
-      .clip_points_to_region(newdata, region, xy_cols = xy_cols)
+      .clip_points_to_region(
+        newdata, region, xy_cols = xy_cols, coord_multiplier = coord_multiplier
+      )
     },
     future.seed = future_seed
   )
   done()
 
   # Sanity checks -------------------------------------------------------------
-  model_sanity <- as.data.frame(sapply(survey_mods, function(k) {
-    if (!inherits(k$mod, "try-error")) sdmTMB::sanity(k$mod, silent = TRUE) else rep(NA, 7)
-  }))
+  model_sanity <- .sanity_table(lapply(survey_mods, `[[`, "mod"))
 
   # Index calculation ---------------------------------------------------------
   step(paste("Computing", length(surveys), "survey indices"))
   survey_indices <- future.apply::future_lapply(
     seq_along(survey_mods),
     function(l) {
+      nd <- prediction_grids[[l]]
       idx <- .safe_index(
-        mod = survey_mods[[l]]$mod, newdata = prediction_grids[[l]],
+        mod = survey_mods[[l]]$mod, newdata = nd,
         time_col = time_col, nsplit = nsplit, bias_correct = bias_correct,
-        level = level, area = area, silent = silent
+        level = level,
+        area = .subset_area(area, nd$.sdmTMBexperiments_row, nrow(newdata)),
+        silent = silent
       )
       ok(paste0(survey_mods[[l]]$model, ": index done"))
       tibble::add_column(idx, model = survey_mods[[l]]$model, .before = 1)
@@ -308,6 +331,7 @@ compare_surveys <- function(
   out <- list(sanity = model_sanity, index = combined_index, grid = pred_diff)
   class(out) <- "sdmTMB_survey_comparison"
   attributes(out)$crs <- object_crs
+  attributes(out)$coord_multiplier <- coord_multiplier
   attributes(out)$reference_label <- reference_label
   attributes(out)$surveys <- surveys
   out
@@ -425,11 +449,9 @@ plot.sdmTMB_survey_comparison <- function(
   surveys <- attributes(x)$surveys
   ref <- attributes(x)$reference_label
 
-  survey_colors <- if (viridis) {
-    stats::setNames(scales::viridis_pal()(length(surveys)), surveys)
-  } else {
-    stats::setNames(.index_color_vector[seq_along(surveys)], surveys)
-  }
+  survey_colors <- stats::setNames(
+    .series_colors(length(surveys), viridis), surveys
+  )
 
   if (type == "index") {
     dat <- x$index
@@ -475,7 +497,7 @@ plot.sdmTMB_survey_comparison <- function(
     }
     ref_dat <- dat |>
       dplyr::filter(.data$model == ref) |>
-      dplyr::select(.data$year, ref_est = .data$est)
+      dplyr::select("year", ref_est = "est")
 
     scatter_dat <- dat |>
       dplyr::filter(.data$model != ref) |>
@@ -495,6 +517,7 @@ plot.sdmTMB_survey_comparison <- function(
         if (sum(stats::complete.cases(d$ref_est, d$est)) < 2) return(NULL)
         m <- stats::lm(est ~ ref_est, data = d)
         cf <- stats::coef(m)
+        if (anyNA(cf)) return(NULL) # e.g. a flat index
         r2 <- summary(m)$r.squared
         sign_op <- if (cf[2] < 0) "-" else "+"
         data.frame(
@@ -548,7 +571,8 @@ plot.sdmTMB_survey_comparison <- function(
           transform_color_scale = transform_color_scale,
           limit_rounding = limit_rounding, break_rounding = break_rounding,
           base_size = base_size, title = paste(names(x$grid)[i], "vs", ref),
-          fill_prefix = fill_prefix
+          fill_prefix = fill_prefix,
+          coord_multiplier = .coord_multiplier(x)
         )
         if (is_pct_response) {
           fill_lab <- if (is.null(fill_prefix)) {

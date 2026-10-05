@@ -10,7 +10,7 @@ sdmTMB_mesh_cv(
   k = 3,
   block_size = NULL,
   response = NULL,
-  xy_cols = c("X", "Y"),
+  xy_cols = NULL,
   coord_multiplier = 1000,
   object_crs = NULL,
   control = NULL,
@@ -35,8 +35,8 @@ offset, weights, priors, etc.) are inherited.}
 presence/absence blocks for \code{\link[blockCV:cv_spatial]{blockCV::cv_spatial()}}. If \code{NULL} (default),
 taken from the model formula's left-hand side.}
 
-\item{xy_cols}{Character vector of the coordinate columns. Default
-\code{c("X", "Y")}.}
+\item{xy_cols}{Character vector of the coordinate columns. If \code{NULL}
+(default), taken from the model mesh (\code{object$spde$xy_cols}).}
 
 \item{coord_multiplier}{Numeric factor to convert \code{xy_cols} to CRS units.
 Default \code{1000}.}

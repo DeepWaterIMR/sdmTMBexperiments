@@ -199,6 +199,9 @@
 
 #' A data frame representing a crashed (non-converged) index
 #'
+#' Has the same columns as a [sdmTMB::get_index_split()] result after
+#' `.safe_index()` has renamed its time column to `year`.
+#'
 #' @param years The years to fill with `NA` index values.
 #' @keywords internal
 #' @noRd
@@ -210,8 +213,110 @@
     upr = NA_real_,
     log_est = NA_real_,
     se = NA_real_,
+    se_natural = NA_real_,
     type = "crashed"
   )
+}
+
+#' Sanity-check table for a set of models
+#'
+#' One column per model and one row per [sdmTMB::sanity()] check. Failed fits
+#' (`try-error` or `NULL`) get a column of `NA`s, with the same check names as
+#' the successful fits.
+#'
+#' @param mods A named list of fitted sdmTMB models and/or `try-error`s.
+#' @return A data frame.
+#' @keywords internal
+#' @noRd
+.sanity_table <- function(mods) {
+  checks <- lapply(mods, function(k) {
+    if (is.null(k) || inherits(k, "try-error")) return(NULL)
+    unlist(sdmTMB::sanity(k, silent = TRUE))
+  })
+  fitted <- !vapply(checks, is.null, logical(1))
+  if (!any(fitted)) {
+    out <- as.data.frame(matrix(NA, nrow = 1, ncol = length(mods)))
+    names(out) <- names(mods)
+    row.names(out) <- "all_ok"
+    return(out)
+  }
+  check_names <- names(checks[[which(fitted)[1]]])
+  out <- lapply(checks, function(x) {
+    if (is.null(x)) stats::setNames(rep(NA, length(check_names)), check_names)
+    else x[check_names]
+  })
+  as.data.frame(out, row.names = check_names, check.names = FALSE)
+}
+
+#' Subset a per-row `area` vector alongside its prediction grid
+#'
+#' @param area A scalar, a column name, or a numeric vector with one value per
+#'   row of the full prediction grid.
+#' @param rows Logical or integer index of the grid rows kept.
+#' @param n Number of rows of the full prediction grid.
+#' @return `area` for the kept rows (scalars and column names unchanged).
+#' @keywords internal
+#' @noRd
+.subset_area <- function(area, rows, n) {
+  if (!is.numeric(area) || length(area) == 1L) return(area)
+  if (length(area) != n) {
+    stop("A numeric `area` vector must have one value per row of `newdata`.",
+         call. = FALSE)
+  }
+  area[rows]
+}
+
+#' The `coord_multiplier` stored on a comparison object
+#'
+#' Objects created before `coord_multiplier` was stored have km coordinates.
+#'
+#' @param x A comparison object.
+#' @keywords internal
+#' @noRd
+.coord_multiplier <- function(x) {
+  cm <- attr(x, "coord_multiplier")
+  if (is.null(cm)) 1000 else cm
+}
+
+#' Does a mesh carry a barrier (from `sdmTMBextra::add_barrier_mesh()`)?
+#'
+#' @param mesh An `sdmTMBmesh` object.
+#' @keywords internal
+#' @noRd
+.has_barrier <- function(mesh) {
+  "spde_barrier" %in% names(mesh)
+}
+
+#' Copy the barrier components of one mesh onto another
+#'
+#' Only valid when both meshes share the same triangulation (e.g. one was
+#' rebuilt from the other's `mesh` for new data), since the barrier components
+#' depend only on the mesh geometry and the barrier polygons.
+#'
+#' @param mesh The `sdmTMBmesh` to add the barrier to.
+#' @param from The `sdmTMBmesh` with a barrier.
+#' @keywords internal
+#' @noRd
+.copy_barrier <- function(mesh, from) {
+  for (nm in c("spde_barrier", "barrier_scaling", "barrier_triangles")) {
+    if (!is.null(from[[nm]])) mesh[[nm]] <- from[[nm]]
+  }
+  mesh
+}
+
+#' Warn that new meshes are built without the model's barrier
+#'
+#' @param mesh The original model's `sdmTMBmesh`.
+#' @param what Character describing which meshes lose the barrier.
+#' @keywords internal
+#' @noRd
+.warn_barrier_dropped <- function(mesh, what) {
+  if (.has_barrier(mesh)) {
+    warning("The model uses a barrier mesh, but ", what, " are built with ",
+            "sdmTMB::make_mesh() and have no barrier. Differences may reflect ",
+            "the barrier as well as the mesh.", call. = FALSE)
+  }
+  invisible(NULL)
 }
 
 #' Safely calculate a split survey index for one model
@@ -223,9 +328,11 @@
 #' @param mod A fitted sdmTMB model, a `try-error`, or `NULL`.
 #' @param newdata Prediction grid data frame.
 #' @param time_col Name of the time column (used for the crashed fallback).
-#' @param nsplit,bias_correct,level,area,silent Passed to
+#' @param nsplit,bias_correct,level,area,silent,predict_args Passed to
 #'   [sdmTMB::get_index_split()].
-#' @return A data frame with the index and a `cv` column.
+#' @return A data frame with the index and a `cv` column. The time column is
+#'   always named `year`, whatever the model's time column is called, so that
+#'   the plotting methods and [mohns_rho()] can rely on it.
 #' @keywords internal
 #' @noRd
 .safe_index <- function(
@@ -236,7 +343,8 @@
   bias_correct,
   level,
   area,
-  silent
+  silent,
+  predict_args = list()
 ) {
   if (is.null(mod) || inherits(mod, "try-error")) {
     return(.crashed_index(unique(newdata[[time_col]])))
@@ -249,9 +357,11 @@
       bias_correct = bias_correct,
       level = level,
       area = area,
-      silent = silent
+      silent = silent,
+      predict_args = predict_args
     )
   )
+  names(idx)[names(idx) == time_col] <- "year"
   idx$cv <- sqrt(exp(idx$se^2) - 1)
   idx
 }
@@ -467,6 +577,21 @@
   "#056A89"
 )
 
+#' Colours for non-reference index series
+#'
+#' @param n Number of series.
+#' @param viridis Use the viridis palette instead of `.index_color_vector`?
+#' @return `n` colours. `.index_color_vector` is interpolated when `n` exceeds
+#'   its length, so there are never `NA` colours.
+#' @keywords internal
+#' @noRd
+.series_colors <- function(n, viridis = FALSE) {
+  if (n < 1) return(character(0))
+  if (viridis) return(scales::viridis_pal()(n))
+  if (n <= length(.index_color_vector)) return(.index_color_vector[seq_len(n)])
+  grDevices::colorRampPalette(.index_color_vector)(n)
+}
+
 #' Build one spatial prediction-difference map on a ggOceanMaps basemap
 #'
 #' Shared by the `plot()` methods of the model, mesh and survey comparisons.
@@ -491,6 +616,8 @@
 #' @param title Panel title.
 #' @param fill_prefix Optional prefix for the fill legend title, replacing the
 #'   default "Biomass density". `NULL` (default) keeps that default.
+#' @param coord_multiplier Numeric factor to convert `X`/`Y` to CRS units.
+#'   Default `1000` (km to m).
 #' @keywords internal
 #' @noRd
 .spatial_diff_map <- function(
@@ -503,7 +630,8 @@
   break_rounding = 5,
   base_size = 11,
   title = NULL,
-  fill_prefix = NULL
+  fill_prefix = NULL,
+  coord_multiplier = 1000
 ) {
   has_mpd <- "mean_pr_diff" %in% names(grid)
   agg <- grid |>
@@ -517,7 +645,9 @@
         NA_real_
       }
     ) |>
-    dplyr::mutate(X = 1000 * .data$X, Y = 1000 * .data$Y) |>
+    dplyr::mutate(
+      X = coord_multiplier * .data$X, Y = coord_multiplier * .data$Y
+    ) |>
     sf::st_as_sf(
       coords = c("X", "Y"),
       crs = suppressWarnings(crs),
@@ -540,7 +670,7 @@
 
   fill_scale <- if (transform_color_scale) {
     ggplot2::scale_fill_gradient2(
-      trans = .negsqrt_trans(),
+      transform = .negsqrt_trans(),
       breaks = breaks,
       labels = break_labels,
       midpoint = 0,

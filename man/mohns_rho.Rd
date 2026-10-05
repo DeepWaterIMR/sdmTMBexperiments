@@ -41,7 +41,11 @@ alternative model) and the reference series estimate in that same year.
 
 This is the shared engine used by the plotting methods of
 \code{\link[=sdmTMB_retro]{sdmTMB_retro()}}, \code{\link[=compare_models]{compare_models()}} and \code{\link[=compare_meshes]{compare_meshes()}}, exposed so it
-can be used directly on any long-format table of index series.
+can be used directly on any long-format table of index series. It is a
+retrospective Mohn's rho only when the series end in different years (as
+retrospective peels do). When all series share the same final year (as in
+\code{\link[=compare_models]{compare_models()}} and \code{\link[=compare_meshes]{compare_meshes()}}), it is the mean relative
+difference in that year.
 }
 \details{
 For each non-reference series \eqn{p} the terminal (maximum) year
