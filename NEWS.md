@@ -1,6 +1,19 @@
 # sdmTMBexperiments (development version)
 
+## New features
+
+- New `sebastes_bathy` dataset (a ~45 KB coarse ETOPO 2022 depth raster of the
+  `sebastes` study area) and `sebastes_depth()`, a `depth_fun` for
+  `make_prediction_grid()`. The examples, vignette and tests use them so they
+  no longer need the ~85 MB bathymetry download `ggOceanMaps::get_depth()`
+  makes on first use. For demonstration only.
+
 ## Bug fixes
+
+- Map helpers no longer fail with `object 'dd_land' not found` when
+  ggOceanMaps is loaded but not attached (as in vignettes, tests and CI);
+  ggOceanMaps is now attached for the duration of the call. The depth
+  download in `make_prediction_grid()` also uses a longer timeout (600 s).
 
 - `sdmTMB_retro()`, `compare_meshes()`, `sdmTMB_mesh_cv()` and
   `compare_surveys()` (with `compiled_model`) now refit models from the

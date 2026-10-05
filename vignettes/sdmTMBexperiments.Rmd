@@ -145,7 +145,7 @@ plot(retr, index_divisor = 1e3, index_unit = "1000 t")
 
 ## Prediction grids
 
-The bundled `sebastes` dataset (beaked redfish survey stations) is used to demonstrate the prediction-grid helpers. `make_survey_prediction_region()` builds a concave hull around a survey's stations, and `make_prediction_grid()` lays a regular grid over it. The function can be used to extract depths and drop cells outside a specified depth range. The example below builds a prediction region and grid for the EggaN survey series, and extracts depths from the default bathymetry source (GEBCO 2022).
+The bundled `sebastes` dataset (beaked redfish survey stations) is used to demonstrate the prediction-grid helpers. `make_survey_prediction_region()` builds a concave hull around a survey's stations, and `make_prediction_grid()` lays a regular grid over it. The function can be used to extract depths and drop cells outside a specified depth range. The example below builds a prediction region and grid for the EggaN survey series, and extracts depths. By default depths come from `ggOceanMaps::get_depth()` (which downloads the ETOPO 2022 bathymetry on first use); here we pass `depth_fun = sebastes_depth`, a small bundled bathymetry of the study area, so the vignette needs no download. Use the default for real analyses.
 
 ```{r grids, message = FALSE}
 data(sebastes)
@@ -159,7 +159,11 @@ qmap(region, fill = I(NA))
 # max_depth turns on depth extraction, via ggOceanMaps::get_depth() by
 # default (bathy_style controls the bathymetry source); cells outside
 # c(1, max_depth) are dropped. plot() then colours by depth automatically.
-grid <- make_prediction_grid(region, resolution = 20, max_depth = 1000)
+# Here `depth_fun = sebastes_depth` uses a small bundled demonstration
+# bathymetry to avoid the large download get_depth() needs on first use.
+grid <- make_prediction_grid(
+  region, resolution = 20, max_depth = 1000, depth_fun = sebastes_depth
+)
 range(grid$depth)
 plot(grid)
 ```
@@ -186,7 +190,9 @@ compiled_model <- sdmTMB(
 )
 
 region <- make_survey_prediction_region(sub, crs = 32633, concavity = 5)
-grid <- make_prediction_grid(region, resolution = 40, max_depth = 500)
+grid <- make_prediction_grid(
+  region, resolution = 40, max_depth = 500, depth_fun = sebastes_depth
+)
 
 plot(grid)
 

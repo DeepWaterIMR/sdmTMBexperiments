@@ -36,3 +36,5 @@ reference:
 - title: Data
   contents:
   - sebastes
+  - sebastes_bathy
+  - sebastes_depth

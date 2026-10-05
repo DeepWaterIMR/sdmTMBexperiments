@@ -47,7 +47,8 @@ data(sebastes)
 eggan <- subset(sebastes, cruiseseries == "EggaN")
 region <- make_survey_prediction_region(eggan, crs = 32633, concavity = 5)
 if (requireNamespace("ggOceanMaps", quietly = TRUE)) {
-  ggOceanMaps::qmap(region, fill = I(NA))
+  library(ggOceanMaps) # qmap() needs ggOceanMaps attached
+  qmap(region, fill = I(NA))
 }
 }
 }
