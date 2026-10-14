@@ -1,6 +1,10 @@
 # Changelog
 
-## sdmTMBexperiments (development version)
+## sdmTMBexperiments 0.1.2
+
+2026-10-14 Adds the model-selection functions and fixes delta-family
+labelling in
+[`sdmTMB_selection()`](https://deepwaterimr.github.io/sdmTMBexperiments/reference/sdmTMB_selection.md).
 
 ### Model selection
 

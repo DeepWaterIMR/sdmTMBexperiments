@@ -96,7 +96,7 @@ region <- make_survey_prediction_region(eggan, crs = 32633, concavity = 5)
 # default (bathy_style controls the bathymetry source); cells outside
 # c(1, max_depth) are dropped. plot() then colours by depth automatically.
 grid <- make_prediction_grid(region, resolution = 20, max_depth = 1000)
-#> Cannot find files: /tmp/RtmpqYH0tz/dd_rbathy_cont.rda. Do you want
+#> Cannot find files: /tmp/RtmpRRVDqh/dd_rbathy_cont.rda. Do you want
 #> download them now?
 range(grid$depth)
 #> [1]   2.007292 975.687500

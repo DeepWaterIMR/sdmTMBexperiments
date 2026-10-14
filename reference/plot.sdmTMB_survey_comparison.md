@@ -172,12 +172,12 @@ sc <- compare_surveys(
 #> ✔ Building 2 survey prediction grids [5ms]
 #> 
 #> ⠙ Computing 2 survey indices
-#> ✔ Computing 2 survey indices [13ms]
+#> ✔ Computing 2 survey indices [5ms]
 #> 
 #> ✔ EcoS: index done
 #> ✔ WinterS: index done
 #> ⠙ Computing spatial prediction differences
-#> ✔ Computing spatial prediction differences [5ms]
+#> ✔ Computing spatial prediction differences [6ms]
 #> 
 #> ✔ EcoS: spatial diff done
 #> ✔ WinterS: spatial diff done

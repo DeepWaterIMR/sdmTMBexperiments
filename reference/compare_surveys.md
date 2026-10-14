@@ -212,7 +212,7 @@ sc <- compare_surveys(
   mesh_cutoff = 50, offset_col = "swept_area", area = cell_area
 )
 #> ⠙ Fitting 2 survey models
-#> ✔ Fitting 2 survey models [7ms]
+#> ✔ Fitting 2 survey models [8ms]
 #> 
 #> ✔ EcoS: model OK
 #> ✔ WinterS: model OK
@@ -220,12 +220,12 @@ sc <- compare_surveys(
 #> ✔ Building 2 survey prediction grids [5ms]
 #> 
 #> ⠙ Computing 2 survey indices
-#> ✔ Computing 2 survey indices [5ms]
+#> ✔ Computing 2 survey indices [6ms]
 #> 
 #> ✔ EcoS: index done
 #> ✔ WinterS: index done
 #> ⠙ Computing spatial prediction differences
-#> ✔ Computing spatial prediction differences [5ms]
+#> ✔ Computing spatial prediction differences [6ms]
 #> 
 #> ✔ EcoS: spatial diff done
 #> ✔ WinterS: spatial diff done

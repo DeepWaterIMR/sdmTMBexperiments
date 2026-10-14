@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">sdmTMBexperiments</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Released version">0.1.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Released version">0.1.2</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -34,9 +34,10 @@
     </div>
 
     <div class="section level2">
-<h2 class="pkg-version" data-toc-text="development version" id="sdmtmbexperiments-development-version">sdmTMBexperiments (development version)<a class="anchor" aria-label="anchor" href="#sdmtmbexperiments-development-version"></a></h2>
+<h2 class="pkg-version" data-toc-text="0.1.2" id="sdmtmbexperiments-012">sdmTMBexperiments 0.1.2<a class="anchor" aria-label="anchor" href="#sdmtmbexperiments-012"></a></h2>
+<p>2026-10-14 Adds the model-selection functions and fixes delta-family labelling in <code><a href="../reference/sdmTMB_selection.html">sdmTMB_selection()</a></code>.</p>
 <div class="section level3">
-<h3 id="model-selection-development-version">Model selection<a class="anchor" aria-label="anchor" href="#model-selection-development-version"></a></h3>
+<h3 id="model-selection-0-1-2">Model selection<a class="anchor" aria-label="anchor" href="#model-selection-0-1-2"></a></h3>
 <p>A set of functions for building defensible model-selection tables, ported from two survey- and CPUE-index workflows:</p>
 <ul><li>
 <code><a href="../reference/sdmTMB_selection.html">sdmTMB_selection()</a></code> fits a named list of candidate specifications to identical records and returns a tidy table: the full specification of each candidate, its crash/convergence/sanity status, in-sample NLL and AIC with delta-AIC and Akaike weights, and — with <code>cv</code> — cross-validated predictive skill. One function covers component ranking, dropping fixed effects, family selection, spatiotemporal-structure selection and mesh resolution, since each is the same operation with a different thing varied. Caches one file per candidate (resumable, and <code>only</code> lets a long ladder be spread over several R sessions).</li>
@@ -52,7 +53,7 @@
 <code><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot()</a></code> methods: <code>type = "selection"</code> is a status-coded dot plot of the ranking; <code>type = "index"</code> overlays the survey index each candidate produces, which answers the question a selection table cannot — whether the choice actually moves the index.</li>
 </ul></div>
 <div class="section level3">
-<h3 id="plotting-development-version">Plotting<a class="anchor" aria-label="anchor" href="#plotting-development-version"></a></h3>
+<h3 id="plotting-0-1-2">Plotting<a class="anchor" aria-label="anchor" href="#plotting-0-1-2"></a></h3>
 <ul><li>
 <code><a href="../reference/plot_mesh.html">plot_mesh()</a></code> gains <code>land_col</code>, <code>lon_interval</code>/<code>lat_interval</code>, <code>utm_axes</code> and <code>zero_col</code>/<code>zero_size</code>/<code>zero_alpha</code>. <strong>All default to the previous behaviour</strong>, so existing figures are unchanged.
 <ul><li>
@@ -62,7 +63,7 @@
 </ul></li>
 </ul></div>
 <div class="section level3">
-<h3 id="fixes-development-version">Fixes<a class="anchor" aria-label="anchor" href="#fixes-development-version"></a></h3>
+<h3 id="fixes-0-1-2">Fixes<a class="anchor" aria-label="anchor" href="#fixes-0-1-2"></a></h3>
 <ul><li>
 <code>.safe_index()</code> (used by <code><a href="../reference/compare_models.html">compare_models()</a></code>, <code><a href="../reference/compare_meshes.html">compare_meshes()</a></code>, <code><a href="../reference/compare_surveys.html">compare_surveys()</a></code>, <code><a href="../reference/sdmTMB_retro.html">sdmTMB_retro()</a></code> and the new selection index plot) now survives a <em>failed index extraction</em>, not only a failed fit. <code><a href="https://sdmTMB.github.io/sdmTMB/reference/get_index.html" class="external-link">get_index_split()</a></code> can throw for a model that fitted perfectly well — a <code>newdata</code> grid that does not overlap the fitted coordinates, a year in the grid but not in the model, a split landing on an empty subset — and because these functions summarise many models in one figure at the end of a multi-hour render, one unlucky model used to take the whole plot with it. It is now warned about (naming the model where the caller supplies a label) and returned as a <code>type = "crashed"</code> row.</li>
 <li>
