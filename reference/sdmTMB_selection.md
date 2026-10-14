@@ -278,14 +278,14 @@ sel <- sdmTMB_selection(
 sel
 #> <sdmTMB_selection> 3 candidates, AIC only 
 #> 
-#>              model    n crashed converged sanity      AIC  deltaAIC
-#>            + depth 2143   FALSE      TRUE  FALSE 13086.73   0.00000
-#>          Year only 2143   FALSE      TRUE  FALSE 13154.57  67.84454
-#>  No spatiotemporal 2143   FALSE      TRUE  FALSE 13234.01 147.28353
-#>     AICweight comparable
-#>  1.000000e+00       TRUE
-#>  1.852449e-15       TRUE
-#>  1.041810e-32       TRUE
+#>              model    n crashed converged sanity      AIC  deltaAIC   AICweight
+#>            + depth 2143   FALSE      TRUE  FALSE 13086.73   0.00000 1.00000e+00
+#>          Year only 2143   FALSE      TRUE  FALSE 13154.57  67.84453 1.85245e-15
+#>  No spatiotemporal 2143   FALSE      TRUE  FALSE 13234.01 147.28353 1.04181e-32
+#>  comparable
+#>        TRUE
+#>        TRUE
+#>        TRUE
 #> 
 #> 3 of 3 rows are comparable.
 #> Best (AIC): + depth

@@ -15,7 +15,7 @@ barrier ("land") triangles are marked with an X.'></head><body>
 
     <a class="navbar-brand me-2" href="../index.html">sdmTMBexperiments</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Released version">0.1.2</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Released version">0.1.3</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -57,6 +57,13 @@ barrier ("land") triangles are marked with an <code>X</code>.</p>
 <span>  <span class="va">crs</span>,</span>
 <span>  data <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  value <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  zero_col <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  zero_size <span class="op">=</span> <span class="fl">0.25</span>,</span>
+<span>  zero_alpha <span class="op">=</span> <span class="fl">0.1</span>,</span>
+<span>  land_col <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  lon_interval <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  lat_interval <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  utm_axes <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  xy_cols <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"X"</span>, <span class="st">"Y"</span><span class="op">)</span>,</span>
 <span>  coord_multiplier <span class="op">=</span> <span class="fl">1000</span>,</span>
 <span>  base_size <span class="op">=</span> <span class="fl">11</span></span>
@@ -84,7 +91,36 @@ basemap.</p></dd>
 
 <dt id="arg-value">value<a class="anchor" aria-label="anchor" href="#arg-value"></a></dt>
 <dd><p>Optional character naming a column in <code>data</code> used to scale the
-point sizes.</p></dd>
+point sizes. Note that <code><a href="https://ggplot2.tidyverse.org/reference/scale_size.html" class="external-link">ggplot2::scale_size_area()</a></code> maps a zero to zero
+area, so stations with no catch become invisible; see <code>zero_col</code>.</p></dd>
+
+
+<dt id="arg-zero-col">zero_col<a class="anchor" aria-label="anchor" href="#arg-zero-col"></a></dt>
+<dd><p>Optional colour for stations where <code>value</code> is zero, drawn as
+small crosses beneath the sized points. <code>NULL</code> (default) omits them, which
+preserves the behaviour of earlier versions. Zeros usually outnumber the
+positive stations by an order of magnitude, so they are drawn small and
+faint (see <code>zero_size</code> and <code>zero_alpha</code>) to avoid burying the response.</p></dd>
+
+
+<dt id="arg-zero-size-zero-alpha">zero_size, zero_alpha<a class="anchor" aria-label="anchor" href="#arg-zero-size-zero-alpha"></a></dt>
+<dd><p>Size and alpha of the <code>zero_col</code> crosses.</p></dd>
+
+
+<dt id="arg-land-col">land_col<a class="anchor" aria-label="anchor" href="#arg-land-col"></a></dt>
+<dd><p>Optional land fill passed to <code><a href="https://mikkovihtakari.github.io/ggOceanMaps/reference/basemap.html" class="external-link">ggOceanMaps::basemap()</a></code>.
+<code>NULL</code> (default) uses the basemap default.</p></dd>
+
+
+<dt id="arg-lon-interval-lat-interval">lon_interval, lat_interval<a class="anchor" aria-label="anchor" href="#arg-lon-interval-lat-interval"></a></dt>
+<dd><p>Optional graticule intervals in degrees,
+passed to <code><a href="https://mikkovihtakari.github.io/ggOceanMaps/reference/basemap.html" class="external-link">ggOceanMaps::basemap()</a></code>. <code>NULL</code> (default) lets basemap decide.</p></dd>
+
+
+<dt id="arg-utm-axes">utm_axes<a class="anchor" aria-label="anchor" href="#arg-utm-axes"></a></dt>
+<dd><p>Logical. If <code>TRUE</code>, label the axes in projected kilometres
+(the units the model actually uses) rather than in degrees. Default
+<code>FALSE</code>, which preserves the behaviour of earlier versions.</p></dd>
 
 
 <dt id="arg-xy-cols">xy_cols<a class="anchor" aria-label="anchor" href="#arg-xy-cols"></a></dt>

@@ -12,13 +12,13 @@ Source:
 [`DESCRIPTION`](https://github.com/DeepWaterIMR/sdmTMBexperiments/blob/main/DESCRIPTION)
 
 Vihtakari M (2026). *sdmTMBexperiments: Experimental Helper Functions
-for 'sdmTMB'*. R package version 0.1.2,
+for 'sdmTMB'*. R package version 0.1.3,
 <https://github.com/DeepWaterIMR/sdmTMBexperiments>.
 
     @Manual{,
       title = {sdmTMBexperiments: Experimental Helper Functions for 'sdmTMB'},
       author = {Mikko Vihtakari},
       year = {2026},
-      note = {R package version 0.1.2},
+      note = {R package version 0.1.3},
       url = {https://github.com/DeepWaterIMR/sdmTMBexperiments},
     }

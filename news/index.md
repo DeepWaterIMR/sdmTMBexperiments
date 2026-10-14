@@ -1,5 +1,11 @@
 # Changelog
 
+## sdmTMBexperiments 0.1.3
+
+2026-10-14 Regenerate `plot_mesh.Rd` so its usage lists the new
+[`plot_mesh()`](https://deepwaterimr.github.io/sdmTMBexperiments/reference/plot_mesh.md)
+arguments (fixes the R CMD check codoc WARNING).
+
 ## sdmTMBexperiments 0.1.2
 
 2026-10-14 Adds the model-selection functions and fixes delta-family
