@@ -126,6 +126,29 @@ test_that("sdmTMB_selection compares candidates on identical records", {
   expect_equal(best_candidate(sel, by = "aic"), sel$table$model[1])
 })
 
+test_that("delta families give one row per candidate and a readable label", {
+  skip_on_cran()
+  cands <- list(
+    "Delta" = list(formula = density ~ 1,
+                   family = sdmTMB::delta_gamma(type = "poisson-link")),
+    "Tweedie" = list(formula = density ~ 1, family = sdmTMB::tweedie())
+  )
+  sel <- sdmTMB_selection(
+    cands, data = sdmTMB::pcod, cutoff = 30, spatial = "on",
+    spatiotemporal = "off", verbose = FALSE
+  )
+  tab <- sel$table[order(sel$table$model), ]
+
+  expect_equal(nrow(tab), 2L)
+  expect_equal(tab$model, c("Delta", "Tweedie"))
+  expect_equal(tab$family[1], sdmTMB::delta_gamma(type = "poisson-link")$clean_name)
+  expect_match(tab$family[1], "poisson-link", fixed = TRUE)
+  expect_match(tab$spec[1], "family = delta_gamma(", fixed = TRUE)
+  # Non-delta families keep their plain name.
+  expect_equal(tab$family[2], "tweedie")
+  expect_match(tab$spec[2], "family = tweedie |", fixed = TRUE)
+})
+
 test_that("sdmTMB_selection requires a deliberate family and formula", {
   expect_error(
     sdmTMB_selection(list("a" = y ~ x), data = data.frame(y = 1, x = 1),

@@ -887,11 +887,28 @@ plot.sdmTMB_selection <- function(
   # what was fitted instead of relying on its label.
   out$spec <- paste0(
     paste(trimws(format(out$formula)), collapse = " "),
-    " | family = ", out$family$family[1],
+    " | family = ", .family_label(out$family),
     " | spatial = ", out$spatial,
     " | spatiotemporal = ", out$spatiotemporal
   )
   out
+}
+
+#' One readable label for an sdmTMB family
+#'
+#' A delta family stores one `family` entry per component (e.g.
+#' `c("binomial", "Gamma")`), so `family$family` used as a table cell recycles
+#' the row, and its first element alone mislabels the fit as "binomial". Use
+#' sdmTMB's `clean_name` (which also carries the links and the Poisson-link
+#' type) when present, otherwise join the components with "/".
+#'
+#' @keywords internal
+#' @noRd
+.family_label <- function(family) {
+  if (is.character(family$clean_name) && length(family$clean_name) == 1L) {
+    return(family$clean_name)
+  }
+  paste(family$family, collapse = "/")
 }
 
 #' File-name-safe slug for a candidate name
@@ -960,7 +977,7 @@ plot.sdmTMB_selection <- function(
       model = nm,
       spec = cand$spec,
       formula = paste(trimws(format(cand$formula)), collapse = " "),
-      family = cand$family$family[1],
+      family = .family_label(cand$family),
       spatial = paste(unlist(cand$spatial), collapse = "/"),
       spatiotemporal = paste(unlist(cand$spatiotemporal), collapse = "/"),
       knots = if (ok) ref$spde$mesh$n else NA_integer_,

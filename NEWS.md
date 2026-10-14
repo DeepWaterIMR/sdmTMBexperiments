@@ -57,6 +57,12 @@ two survey- and CPUE-index workflows:
   models in one figure at the end of a multi-hour render, one unlucky model used
   to take the whole plot with it. It is now warned about (naming the model where
   the caller supplies a label) and returned as a `type = "crashed"` row.
+- `sdmTMB_selection()` handles delta families: the table has exactly one row per
+  candidate (a delta family's two-element `family$family` no longer recycles the
+  row), and the `family` column and `spec` string use sdmTMB's `clean_name`
+  (e.g. `delta_gamma(link1 = 'log', link2 = 'log', type = 'poisson-link')`)
+  instead of the first component's family, which labelled a Poisson-link delta
+  fit as "binomial". Non-delta families are unchanged (e.g. "tweedie").
 
 # sdmTMBexperiments 0.1.0
 
