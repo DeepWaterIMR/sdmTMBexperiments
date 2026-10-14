@@ -69,6 +69,11 @@ is `future_seed` everywhere. See [memory/naming-conventions.md](memory/naming-co
 - `.safe_brewer()` — palette-safe wrapper around RColorBrewer for any `n`.
 
 ### Function families and S3 classes
+- Model selection ([R/model-selection.R](R/model-selection.R)):
+  `sdmTMB_selection()` → `sdmTMB_selection` (+ `print`/`plot`), built on
+  `selection_frame()` (identical records), `sdmTMB_cv_summary()`
+  (per-observation hold-out log-likelihood), `add_aic_weights()` and
+  `best_candidate()` (look the winner up in the column, never by row position).
 - Comparisons return `sdmTMB_model_comparison`, `sdmTMB_mesh_comparison`,
   `sdmTMB_survey_comparison`, each with a `plot()` method (index / spatial, and
   scatter for surveys).

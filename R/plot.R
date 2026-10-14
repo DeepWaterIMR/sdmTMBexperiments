@@ -20,7 +20,21 @@
 #' @param data Optional data frame of sampling positions with coordinate columns
 #'   (see `xy_cols`), plotted as red points.
 #' @param value Optional character naming a column in `data` used to scale the
-#'   point sizes.
+#'   point sizes. Note that [ggplot2::scale_size_area()] maps a zero to zero
+#'   area, so stations with no catch become invisible; see `zero_col`.
+#' @param zero_col Optional colour for stations where `value` is zero, drawn as
+#'   small crosses beneath the sized points. `NULL` (default) omits them, which
+#'   preserves the behaviour of earlier versions. Zeros usually outnumber the
+#'   positive stations by an order of magnitude, so they are drawn small and
+#'   faint (see `zero_size` and `zero_alpha`) to avoid burying the response.
+#' @param zero_size,zero_alpha Size and alpha of the `zero_col` crosses.
+#' @param land_col Optional land fill passed to [ggOceanMaps::basemap()].
+#'   `NULL` (default) uses the basemap default.
+#' @param lon_interval,lat_interval Optional graticule intervals in degrees,
+#'   passed to [ggOceanMaps::basemap()]. `NULL` (default) lets basemap decide.
+#' @param utm_axes Logical. If `TRUE`, label the axes in projected kilometres
+#'   (the units the model actually uses) rather than in degrees. Default
+#'   `FALSE`, which preserves the behaviour of earlier versions.
 #' @param xy_cols Character vector of the coordinate columns in `data`. Default
 #'   `c("X", "Y")`.
 #' @param coord_multiplier Numeric factor to convert model coordinates to CRS
@@ -43,6 +57,13 @@ plot_mesh <- function(
   crs,
   data = NULL,
   value = NULL,
+  zero_col = NULL,
+  zero_size = 0.25,
+  zero_alpha = 0.1,
+  land_col = NULL,
+  lon_interval = NULL,
+  lat_interval = NULL,
+  utm_axes = FALSE,
   xy_cols = c("X", "Y"),
   coord_multiplier = 1000,
   base_size = 11
@@ -69,9 +90,24 @@ plot_mesh <- function(
     coords = c("X", "Y"), crs = suppressWarnings(sf::st_crs(crs))
   )
 
-  p <- ggOceanMaps::basemap(nodes_sf, crs = mesh_crs, base_size = base_size)
+  basemap_args <- list(nodes_sf, crs = mesh_crs, base_size = base_size)
+  if (!is.null(land_col)) basemap_args$land.col <- land_col
+  if (!is.null(lon_interval)) basemap_args$lon.interval <- lon_interval
+  if (!is.null(lat_interval)) basemap_args$lat.interval <- lat_interval
+  p <- do.call(ggOceanMaps::basemap, basemap_args)
 
   if (!is.null(data)) {
+    if (!is.null(value) && !is.null(zero_col)) {
+      zero <- data[!is.na(data[[value]]) & data[[value]] <= 0, , drop = FALSE]
+      data <- data[is.na(data[[value]]) | data[[value]] > 0, , drop = FALSE]
+      if (nrow(zero) > 0) {
+        p <- p + ggplot2::geom_point(
+          data = zero,
+          mapping = ggplot2::aes(x = .data[[xy_cols[1]]], y = .data[[xy_cols[2]]]),
+          shape = 4, size = zero_size, alpha = zero_alpha, color = zero_col
+        )
+      }
+    }
     aes_pts <- if (!is.null(value)) {
       ggplot2::aes(x = .data[[xy_cols[1]]], y = .data[[xy_cols[2]]],
                    size = .data[[value]])
@@ -92,6 +128,21 @@ plot_mesh <- function(
     p <- p + ggplot2::geom_sf(
       data = barrier_sf, shape = 4, size = 2, inherit.aes = FALSE
     )
+  }
+
+  if (utm_axes) {
+    # `mesh_crs` is the km-unit twin of `crs`, so a graticule on that datum labels the axes in
+    # the same kilometres the model fits in. The breaks must be given as explicit numeric values
+    # in those kilometres: a breaks *function* is evaluated against the panel range rather than
+    # the graticule, which bunches every label into one corner.
+    p <- p +
+      ggplot2::coord_sf(datum = mesh_crs, expand = FALSE) +
+      ggplot2::scale_x_continuous(
+        "Easting (UTM, km)", breaks = pretty(range(loc[, 1]), n = 6)
+      ) +
+      ggplot2::scale_y_continuous(
+        "Northing (UTM, km)", breaks = pretty(range(loc[, 2]), n = 6)
+      )
   }
 
   p + ggplot2::theme(legend.position = "none")

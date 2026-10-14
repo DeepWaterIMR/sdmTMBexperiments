@@ -172,6 +172,19 @@ examples/vignettes or from user review. Each is also noted in `NEWS.md`.
     had been accidentally committed at the repo top level (added to
     `.gitignore`/`.Rbuildignore`).
 
+19. **`.safe_index()` only survived a crashed *model*, not a crashed
+    *extraction*.** `sdmTMB::get_index_split()` can throw for a model that
+    fitted perfectly well — a `newdata` grid that does not overlap the fitted
+    coordinates, a year present in the grid but not in the model, an `nsplit`
+    that lands on an empty subset. Because every comparison function summarises
+    many models in one figure, and those figures are drawn at the end of renders
+    measured in hours, a single unlucky model aborted the whole plot with an
+    opaque tibble recycling error from deep inside `predict.sdmTMB()`. Found by
+    smoke-testing the new selection index plot against a deliberately mismatched
+    grid. Now wrapped in `try()`: warns (naming the model when the caller passes
+    a `label`) and returns a `type = "crashed"` row, the same fallback a crashed
+    model already got.
+
 ## Portability change
 The source repo used `future::multicore`; the package uses the portable
 `future::multisession` so it works on Windows and in R CMD check.

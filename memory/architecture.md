@@ -9,6 +9,11 @@
 - `R/prediction-grid.R` — `make_survey_prediction_region()`,
   `make_prediction_grid()`, internal `.clip_points_to_region()`
 - `R/mohns-rho.R` — `mohns_rho()`
+- `R/model-selection.R` — `sdmTMB_selection()` + `print`/`plot` methods,
+  `selection_frame()`, `sdmTMB_cv_summary()`, `best_candidate()`,
+  `add_aic_weights()`, and the internals `.resolve_candidate()`,
+  `.selection_table()`, `.selection_slug()`, `.selection_status()`,
+  `.all_sane()`, `.min_or_na()`, `.modal()`, `.is_true()`
 - `R/plot.R` — diagnostic/result plotting helpers
 - `R/bubble-map.R` — `bubble_map()`
 - `R/utils.R` — internal shared helpers
@@ -21,8 +26,12 @@
 - `.set_future_memory()` — sizes `future.globals.maxSize` from free RAM via `ps`
   (guarded); this is where the old "computed but never assigned" memory bug was
   fixed.
-- `.safe_index()` — `sdmTMB::get_index_split()` with a crashed-model fallback and
-  a `cv` column. Used by all four comparison/retro functions.
+- `.safe_index()` — `sdmTMB::get_index_split()` with a `cv` column and a fallback
+  for **both** a crashed model and a crashed *extraction* (an overlapping-grid or
+  empty-split failure from a model that fitted fine): warns, naming the model when
+  a `label` is given, and returns a `type = "crashed"` row rather than aborting a
+  figure that summarises many models at the end of a long render. Used by all the
+  comparison/retro functions and by `plot.sdmTMB_selection(type = "index")`.
 - `.pred_diff_base()` — predicts a model and a reference model onto the shared
   years and returns per-cell `est`, `ref_est`, `diff`, `pr_diff` (+ `depth`).
 - `.spatial_diff_map()` — builds one ggOceanMaps spatial-difference map;
@@ -59,7 +68,41 @@
 
 ## S3 classes
 `sdmTMB_model_comparison`, `sdmTMB_mesh_comparison`, `sdmTMB_survey_comparison`,
-`sdmTMB_retro`, `sdmTMB_mesh_cv` — each with a `plot()` method.
+`sdmTMB_retro`, `sdmTMB_mesh_cv`, `sdmTMB_selection` — each with a `plot()`
+method (`sdmTMB_selection` also has `print()`).
+
+## The model-selection contract (`R/model-selection.R`)
+The design decisions behind the selection table, all of them fixes for ways a
+selection table can lie:
+
+- **Identical records.** `selection_frame()` drops rows incomplete for *any*
+  candidate before fitting, so AIC and hold-out log-likelihoods compare the same
+  quantity. Without it, a candidate carrying `s(depth)` is silently fitted to a
+  different subset than one that is not. Select on that frame; fit the *chosen*
+  specification to the full data afterwards.
+- **A `spec` column.** Every row carries the full specification (formula,
+  family, spatial, spatiotemporal) built when the candidate is resolved, so the
+  table states what was fitted instead of relying on a row label.
+- **Per-observation hold-out log-likelihood.** A summed one is not comparable
+  across candidates that scored different numbers of points, and rewards the
+  candidate that scored fewest. `n_heldout` and `folds_pdhess` are reported so a
+  fragile row is visible.
+- **`comparable` gates on convergence and record count, NOT on `sanity()`.**
+  `sanity()` fails routinely on perfectly usable fits (`se_magnitude_ok`,
+  `sigmas_ok` on `pcod`, for instance), so gating on it would drop the
+  best-fitting candidate from every comparison. It is reported in its own column
+  and colours the `type = "selection"` dot plot instead.
+- **Never read the winner off row 1.** `best_candidate()` looks it up in the
+  metric column among comparable rows; the table's sort key changes with whether
+  CV ran.
+- **Cache one file per candidate**, keyed by a slug plus a hash of the exact
+  name (`"+ depth"` and `"depth"` normalise identically, and a collision would
+  serve one candidate's fit as another's). `only` restricts a call to named
+  candidates so a long ladder can be spread over several R sessions, which
+  matters when a large spatiotemporal fit exhausts memory after a dozen
+  accumulate in one process.
+- **`fit_full = FALSE`** skips the whole-frame fit and reads the status columns
+  off the cross-validation instead, with `AIC` as the median across fold models.
 
 ## Parallelism
 All heavy loops use `future.apply::future_lapply(..., future.seed = future_seed)`

@@ -7,6 +7,13 @@ development:
   mode: auto
 
 reference:
+- title: Model selection
+  contents:
+  - sdmTMB_selection
+  - selection_frame
+  - best_candidate
+  - add_aic_weights
+  - sdmTMB_cv_summary
 - title: Model and mesh comparison
   contents:
   - compare_models

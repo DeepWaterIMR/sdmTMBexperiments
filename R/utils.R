@@ -83,14 +83,24 @@
 #' Safely calculate a split survey index for one model
 #'
 #' Wraps [sdmTMB::get_index_split()] with a graceful fallback for models that
-#' failed to fit (returned a `try-error` or `NULL`), and appends a coefficient
-#' of variation (`cv`) column.
+#' failed to fit (returned a `try-error` or `NULL`) **or whose index extraction
+#' itself fails**, and appends a coefficient of variation (`cv`) column.
+#'
+#' The second case matters as much as the first. Index extraction can throw for
+#' a model that fitted perfectly well -- a `newdata` grid that does not overlap
+#' the fitted coordinates, a year present in the grid but not in the model, a
+#' split that lands on an empty subset -- and these functions are called from
+#' plots that summarise many models at once, at the end of renders measured in
+#' hours. One unlucky model should cost its own row, not the whole figure, so
+#' the failure is warned about (with the model's name where the caller supplies
+#' one) and returned as a `type = "crashed"` row rather than propagated.
 #'
 #' @param mod A fitted sdmTMB model, a `try-error`, or `NULL`.
 #' @param newdata Prediction grid data frame.
 #' @param time_col Name of the time column (used for the crashed fallback).
 #' @param nsplit,bias_correct,level,area,silent Passed to
 #'   [sdmTMB::get_index_split()].
+#' @param label Optional model name, used in the warning when extraction fails.
 #' @return A data frame with the index and a `cv` column.
 #' @keywords internal
 #' @noRd
@@ -102,22 +112,36 @@
   bias_correct,
   level,
   area,
-  silent
+  silent,
+  label = NULL
 ) {
   if (is.null(mod) || inherits(mod, "try-error")) {
     return(.crashed_index(unique(newdata[[time_col]])))
   }
-  idx <- suppressMessages(
-    sdmTMB::get_index_split(
-      obj = mod,
-      newdata = newdata,
-      nsplit = nsplit,
-      bias_correct = bias_correct,
-      level = level,
-      area = area,
-      silent = silent
-    )
+  idx <- try(
+    suppressMessages(
+      sdmTMB::get_index_split(
+        obj = mod,
+        newdata = newdata,
+        nsplit = nsplit,
+        bias_correct = bias_correct,
+        level = level,
+        area = area,
+        silent = silent
+      )
+    ),
+    silent = TRUE
   )
+  if (inherits(idx, "try-error")) {
+    warning(
+      "Index extraction failed for ",
+      if (is.null(label)) "one model" else paste0("'", label, "'"), ": ",
+      conditionMessage(attr(idx, "condition")),
+      " -- returning a crashed index row for it.",
+      call. = FALSE
+    )
+    return(.crashed_index(unique(newdata[[time_col]])))
+  }
   idx$cv <- sqrt(exp(idx$se^2) - 1)
   idx
 }

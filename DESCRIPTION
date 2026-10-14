@@ -48,7 +48,8 @@ Suggests:
     RColorBrewer,
     rmarkdown,
     testthat,
-    tidyr    
+    tidyr,
+    withr
 URL: https://github.com/DeepWaterIMR/sdmTMBexperiments, https://deepwaterimr.github.io/sdmTMBexperiments/
 BugReports: https://github.com/DeepWaterIMR/sdmTMBexperiments/issues
 VignetteBuilder: knitr
