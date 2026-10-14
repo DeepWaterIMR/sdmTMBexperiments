@@ -18,6 +18,7 @@ maintainer's public package metadata. Use placeholders: `~/...`,
 - [Example data](example-data.md) — `sebastes` provenance and regeneration
 - [Known fixes](known-fixes.md) — audit trail of bugs found and fixed (porting-era and later)
 - [Roadmap](roadmap.md) — future work and CRAN readiness
+- [Versioning](versioning.md) — bump Version + Date in DESCRIPTION and a NEWS heading with every commit
 - [Examples policy](examples-policy.md) — `\donttest{}` (pkgdown runs it by default) + `_R_CHECK_DONTTEST_EXAMPLES_: false` in CI to keep `R CMD check` fast
 
 ## Who I work with

@@ -158,6 +158,12 @@ If you are helping work on the package source (not just using it), start with
 [CLAUDE.md](CLAUDE.md) and the [`memory/`](memory/) folder. `memory/` is the
 project's persistent memory; [`memory/MEMORY.md`](memory/MEMORY.md) is the index.
 
+**Bump the version with every commit.** Increase `Version` in `DESCRIPTION`
+(by default one patch step per commit; minor/major only when the maintainer
+asks), set `Date` to the
+commit date, and give `NEWS.md` a matching `# sdmTMBexperiments x.y.z` heading.
+See [`memory/versioning.md`](memory/versioning.md).
+
 **Do not put personal information into `memory/`, `AGENTS.md`, or `CLAUDE.md`.**
 The whole repository is public on GitHub. Never commit absolute local paths
 (e.g. `/Users/<name>/...`), machine-specific filenames, or contact details
