@@ -140,18 +140,12 @@ cv <- sdmTMB_mesh_cv(fit, mesh_cutoffs = c(15, 30), k = 3)
 #> ℹ `sigma_E` is the spatiotemporal standard deviation
 #> ℹ `ln_kappa` is an internal parameter affecting `range`
 #> ℹ `range` is the distance at which data are effectively independent
-#> ℹ `ln_tau_O` is an internal parameter affecting `sigma_O`
-#> ℹ `sigma_O` is the spatial standard deviation
-#> ℹ `ln_tau_E` is an internal parameter affecting `sigma_E`
-#> ℹ `sigma_E` is the spatiotemporal standard deviation
-#> ℹ `ln_kappa` is an internal parameter affecting `range`
-#> ℹ `range` is the distance at which data are effectively independent
 cv
 #> # A tibble: 2 × 10
 #>   cutoff crashed converged sanity sum_loglik mean_aic deltaNLL deltaNLL_pr
 #>    <int> <lgl>   <lgl>     <lgl>       <dbl>    <dbl>    <dbl>       <dbl>
-#> 1     30 FALSE   TRUE      FALSE      -7613.    8781.       0          0  
-#> 2     15 FALSE   TRUE      TRUE       -9819.    8644.    2206.        29.0
+#> 1     30 FALSE   TRUE      FALSE      -7539.    8794.       0         0   
+#> 2     15 FALSE   TRUE      TRUE       -7960.    8663.     420.        5.58
 #> # ℹ 2 more variables: deltaAIC <dbl>, deltaAIC_pr <dbl>
 plot(cv)
 

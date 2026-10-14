@@ -34,6 +34,42 @@
     </div>
 
     <div class="section level2">
+<h2 class="pkg-version" data-toc-text="development version" id="sdmtmbexperiments-development-version">sdmTMBexperiments (development version)<a class="anchor" aria-label="anchor" href="#sdmtmbexperiments-development-version"></a></h2>
+<div class="section level3">
+<h3 id="model-selection-development-version">Model selection<a class="anchor" aria-label="anchor" href="#model-selection-development-version"></a></h3>
+<p>A set of functions for building defensible model-selection tables, ported from two survey- and CPUE-index workflows:</p>
+<ul><li>
+<code><a href="../reference/sdmTMB_selection.html">sdmTMB_selection()</a></code> fits a named list of candidate specifications to identical records and returns a tidy table: the full specification of each candidate, its crash/convergence/sanity status, in-sample NLL and AIC with delta-AIC and Akaike weights, and — with <code>cv</code> — cross-validated predictive skill. One function covers component ranking, dropping fixed effects, family selection, spatiotemporal-structure selection and mesh resolution, since each is the same operation with a different thing varied. Caches one file per candidate (resumable, and <code>only</code> lets a long ladder be spread over several R sessions).</li>
+<li>
+<code><a href="../reference/selection_frame.html">selection_frame()</a></code> builds the complete-case frame that makes those columns comparable in the first place: candidates that use different covariates otherwise get silently fitted to different subsets of the data.</li>
+<li>
+<code><a href="../reference/sdmTMB_cv_summary.html">sdmTMB_cv_summary()</a></code> summarises an <code><a href="https://sdmTMB.github.io/sdmTMB/reference/sdmTMB_cv.html" class="external-link">sdmTMB::sdmTMB_cv()</a></code> run <strong>per held-out observation</strong> rather than summed over folds, and reports <code>folds_pdhess</code> and <code>n_heldout</code> so a fragile row is visible as such. A summed hold-out log-likelihood rewards whichever candidate scored fewest points.</li>
+<li>
+<code><a href="../reference/best_candidate.html">best_candidate()</a></code> looks the winner up in the metric column rather than by row position, skipping rows the table marks as not comparable. Also builds a cross-validation shortlist from an AIC ladder (<code>n</code>).</li>
+<li>
+<code><a href="../reference/add_aic_weights.html">add_aic_weights()</a></code> adds <code>deltaAIC</code>/<code>AICweight</code> to any table with an <code>AIC</code> column, with a <code>group</code> argument for tables that mix models fitted to different response data (where a common weight would be meaningless).</li>
+<li>
+<code><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot()</a></code> methods: <code>type = "selection"</code> is a status-coded dot plot of the ranking; <code>type = "index"</code> overlays the survey index each candidate produces, which answers the question a selection table cannot — whether the choice actually moves the index.</li>
+</ul></div>
+<div class="section level3">
+<h3 id="plotting-development-version">Plotting<a class="anchor" aria-label="anchor" href="#plotting-development-version"></a></h3>
+<ul><li>
+<code><a href="../reference/plot_mesh.html">plot_mesh()</a></code> gains <code>land_col</code>, <code>lon_interval</code>/<code>lat_interval</code>, <code>utm_axes</code> and <code>zero_col</code>/<code>zero_size</code>/<code>zero_alpha</code>. <strong>All default to the previous behaviour</strong>, so existing figures are unchanged.
+<ul><li>
+<code>utm_axes = TRUE</code> labels the axes in projected kilometres — the units the model actually fits in — instead of degrees. The breaks are explicit numeric values derived from the mesh extent; a breaks <em>function</em> is evaluated against the panel range rather than the <code>coord_sf()</code> graticule and bunches every label into one corner.</li>
+<li>
+<code>zero_col</code> draws stations whose <code>value</code> is zero as small faint crosses beneath the sized points. Without it they are invisible, because <code>scale_size_area()</code> maps zero to zero area — yet in a survey dataset the zeros are usually the majority of the stations and carry the absence information. They are drawn small and faint by default for the same reason.</li>
+</ul></li>
+</ul></div>
+<div class="section level3">
+<h3 id="fixes-development-version">Fixes<a class="anchor" aria-label="anchor" href="#fixes-development-version"></a></h3>
+<ul><li>
+<code>.safe_index()</code> (used by <code><a href="../reference/compare_models.html">compare_models()</a></code>, <code><a href="../reference/compare_meshes.html">compare_meshes()</a></code>, <code><a href="../reference/compare_surveys.html">compare_surveys()</a></code>, <code><a href="../reference/sdmTMB_retro.html">sdmTMB_retro()</a></code> and the new selection index plot) now survives a <em>failed index extraction</em>, not only a failed fit. <code><a href="https://sdmTMB.github.io/sdmTMB/reference/get_index.html" class="external-link">get_index_split()</a></code> can throw for a model that fitted perfectly well — a <code>newdata</code> grid that does not overlap the fitted coordinates, a year in the grid but not in the model, a split landing on an empty subset — and because these functions summarise many models in one figure at the end of a multi-hour render, one unlucky model used to take the whole plot with it. It is now warned about (naming the model where the caller supplies a label) and returned as a <code>type = "crashed"</code> row.</li>
+<li>
+<code><a href="../reference/sdmTMB_selection.html">sdmTMB_selection()</a></code> handles delta families: the table has exactly one row per candidate (a delta family’s two-element <code>family$family</code> no longer recycles the row), and the <code>family</code> column and <code>spec</code> string use sdmTMB’s <code>clean_name</code> (e.g. <code>delta_gamma(link1 = 'log', link2 = 'log', type = 'poisson-link')</code>) instead of the first component’s family, which labelled a Poisson-link delta fit as “binomial”. Non-delta families are unchanged (e.g. “tweedie”).</li>
+</ul></div>
+</div>
+    <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.1.0" id="sdmtmbexperiments-010">sdmTMBexperiments 0.1.0<a class="anchor" aria-label="anchor" href="#sdmtmbexperiments-010"></a></h2>
 <p>First release. Experimental helper functions for fitted <a href="https://github.com/sdmTMB/sdmTMB" class="external-link">sdmTMB</a> models, ported and generalised from project-local helpers.</p>
 <div class="section level3">
@@ -118,7 +154,7 @@
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.1.</p>
 </div>
 
     </footer></div>

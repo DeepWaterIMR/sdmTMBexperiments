@@ -1,5 +1,18 @@
 # Package index
 
+## Model selection
+
+- [`sdmTMB_selection()`](https://deepwaterimr.github.io/sdmTMBexperiments/reference/sdmTMB_selection.md)
+  : Compare a set of sdmTMB model-selection candidates
+- [`selection_frame()`](https://deepwaterimr.github.io/sdmTMBexperiments/reference/selection_frame.md)
+  : Complete-case frame for a set of model-selection candidates
+- [`best_candidate()`](https://deepwaterimr.github.io/sdmTMBexperiments/reference/best_candidate.md)
+  : The best candidate in a selection table
+- [`add_aic_weights()`](https://deepwaterimr.github.io/sdmTMBexperiments/reference/add_aic_weights.md)
+  : Add delta-AIC and Akaike weights to a comparison table
+- [`sdmTMB_cv_summary()`](https://deepwaterimr.github.io/sdmTMBexperiments/reference/sdmTMB_cv_summary.md)
+  : Summarise an sdmTMB cross-validation on a per-observation scale
+
 ## Model and mesh comparison
 
 - [`compare_models()`](https://deepwaterimr.github.io/sdmTMBexperiments/reference/compare_models.md)
@@ -55,6 +68,8 @@
   : Plot a prediction grid on a map
 - [`plot(`*`<sdmTMB_retro>`*`)`](https://deepwaterimr.github.io/sdmTMBexperiments/reference/plot.sdmTMB_retro.md)
   : Plot retrospective indices from sdmTMB_retro
+- [`plot(`*`<sdmTMB_selection>`*`)`](https://deepwaterimr.github.io/sdmTMBexperiments/reference/plot.sdmTMB_selection.md)
+  : Plot an sdmTMB selection table
 - [`plot(`*`<sdmTMB_survey_comparison>`*`)`](https://deepwaterimr.github.io/sdmTMBexperiments/reference/plot.sdmTMB_survey_comparison.md)
   : Plot survey comparison results
 

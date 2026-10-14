@@ -74,6 +74,68 @@ plot_residual_qq(m1)
 plot_variance_partitioning(m1)
 ```
 
+### Model selection
+
+[`sdmTMB_selection()`](https://deepwaterimr.github.io/sdmTMBexperiments/reference/sdmTMB_selection.md)
+fits a named list of candidates to identical records and returns a tidy,
+defensible selection table. The same function covers every selection
+stage — component ranking, dropping fixed effects, family,
+spatiotemporal structure, mesh resolution — because each is the same
+operation with a different thing varied.
+
+``` r
+
+cands <- list(
+  "Full model"        = density ~ 0 + as.factor(year) + depth_scaled,
+  "No depth"          = density ~ 0 + as.factor(year),
+  "No spatiotemporal" = list(spatiotemporal = "off"),
+  "Tweedie"           = list(family = tweedie()),
+  "Coarser mesh"      = list(cutoff = 40)
+)
+
+sel <- sdmTMB_selection(
+  cands, data = pcod,
+  formula = density ~ 0 + as.factor(year) + depth_scaled,
+  cutoff = 25, family = tweedie(), time = "year",
+  spatial = "on", spatiotemporal = "iid",
+  cache_dir = "data/output/selection"      # one file per candidate, resumable
+)
+
+sel                                  # print method: the table + comparability
+plot(sel)                            # status-coded ranking dot plot
+plot(sel, type = "index", newdata = nd)   # does the choice move the index?
+best_candidate(sel)                  # by the metric column, never by row order
+```
+
+Cross-validate a **shortlist**, not the whole ladder — CV costs `k` fits
+per candidate:
+
+``` r
+
+short <- best_candidate(sel, n = 3, by = "aic")
+cv <- sdmTMB_selection(cands[short], data = pcod, ..., cv = 10,
+                       cache_dir = "data/output/selection")
+```
+
+Rules that make the table mean something (all enforced or reported by
+the function; see
+[`?sdmTMB_selection`](https://deepwaterimr.github.io/sdmTMBexperiments/reference/sdmTMB_selection.md)):
+
+- Candidates are fitted to **identical records**
+  (`complete_cases = TRUE`, via
+  [`selection_frame()`](https://deepwaterimr.github.io/sdmTMBexperiments/reference/selection_frame.md)).
+  Fit the *selected* specification to the full data afterwards.
+- Compare only rows with `comparable == TRUE`, and never quote a delta
+  between two candidates unless both are.
+- Hold-out log-likelihood is reported **per observation**, with
+  `n_heldout` and `folds_pdhess` beside it.
+- `fold_ids` from
+  [`blockCV::cv_spatial()`](https://rdrr.io/pkg/blockCV/man/cv_spatial.html)
+  gives spatially clustered folds (extrapolation into unsampled ground);
+  the default random folds measure interpolation. `lfo = TRUE` scores
+  prediction of unseen *years*, which is what an assessment update
+  actually asks.
+
 ### Survey comparison (uses the bundled `sebastes` data)
 
 [`compare_surveys()`](https://deepwaterimr.github.io/sdmTMBexperiments/reference/compare_surveys.md)
@@ -102,6 +164,13 @@ grid <- make_prediction_grid(region, resolution = 20)
     turn it on only for final runs.
 4.  **`compare_surveys(type = "spatial")`** needs a `compiled_model`;
     without one, spatial differences are skipped.
+5.  **Do not read the selected model off the first table row.** Use
+    [`best_candidate()`](https://deepwaterimr.github.io/sdmTMBexperiments/reference/best_candidate.md);
+    the sort key changes with whether cross-validation ran.
+6.  **A `sanity = FALSE` winner is not disqualified.**
+    [`sanity()`](https://sdmTMB.github.io/sdmTMB/reference/sanity.html)
+    fails routinely on usable fits, so it does not gate `comparable` —
+    read it as a reason to consider simplifying, not as a row to skip.
 
 ## Where to find more
 

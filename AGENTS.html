@@ -85,9 +85,45 @@
 <span><span class="fu"><a href="reference/plot_residual_qq.html">plot_residual_qq</a></span><span class="op">(</span><span class="va">m1</span><span class="op">)</span></span>
 <span><span class="fu"><a href="reference/plot_variance_partitioning.html">plot_variance_partitioning</a></span><span class="op">(</span><span class="va">m1</span><span class="op">)</span></span></code></pre></div>
 <div class="section level3">
+<h3 id="model-selection">Model selection<a class="anchor" aria-label="anchor" href="#model-selection"></a></h3>
+<p><code><a href="reference/sdmTMB_selection.html">sdmTMB_selection()</a></code> fits a named list of candidates to identical records and returns a tidy, defensible selection table. The same function covers every selection stage — component ranking, dropping fixed effects, family, spatiotemporal structure, mesh resolution — because each is the same operation with a different thing varied.</p>
+<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">cands</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
+<span>  <span class="st">"Full model"</span>        <span class="op">=</span> <span class="va">density</span> <span class="op">~</span> <span class="fl">0</span> <span class="op">+</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">as.factor</a></span><span class="op">(</span><span class="va">year</span><span class="op">)</span> <span class="op">+</span> <span class="va">depth_scaled</span>,</span>
+<span>  <span class="st">"No depth"</span>          <span class="op">=</span> <span class="va">density</span> <span class="op">~</span> <span class="fl">0</span> <span class="op">+</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">as.factor</a></span><span class="op">(</span><span class="va">year</span><span class="op">)</span>,</span>
+<span>  <span class="st">"No spatiotemporal"</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>spatiotemporal <span class="op">=</span> <span class="st">"off"</span><span class="op">)</span>,</span>
+<span>  <span class="st">"Tweedie"</span>           <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>family <span class="op">=</span> <span class="fu"><a href="https://sdmTMB.github.io/sdmTMB/reference/families.html" class="external-link">tweedie</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span>,</span>
+<span>  <span class="st">"Coarser mesh"</span>      <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>cutoff <span class="op">=</span> <span class="fl">40</span><span class="op">)</span></span>
+<span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">sel</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/sdmTMB_selection.html">sdmTMB_selection</a></span><span class="op">(</span></span>
+<span>  <span class="va">cands</span>, data <span class="op">=</span> <span class="va">pcod</span>,</span>
+<span>  formula <span class="op">=</span> <span class="va">density</span> <span class="op">~</span> <span class="fl">0</span> <span class="op">+</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">as.factor</a></span><span class="op">(</span><span class="va">year</span><span class="op">)</span> <span class="op">+</span> <span class="va">depth_scaled</span>,</span>
+<span>  cutoff <span class="op">=</span> <span class="fl">25</span>, family <span class="op">=</span> <span class="fu"><a href="https://sdmTMB.github.io/sdmTMB/reference/families.html" class="external-link">tweedie</a></span><span class="op">(</span><span class="op">)</span>, time <span class="op">=</span> <span class="st">"year"</span>,</span>
+<span>  spatial <span class="op">=</span> <span class="st">"on"</span>, spatiotemporal <span class="op">=</span> <span class="st">"iid"</span>,</span>
+<span>  cache_dir <span class="op">=</span> <span class="st">"data/output/selection"</span>      <span class="co"># one file per candidate, resumable</span></span>
+<span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">sel</span>                                  <span class="co"># print method: the table + comparability</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">sel</span><span class="op">)</span>                            <span class="co"># status-coded ranking dot plot</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">sel</span>, type <span class="op">=</span> <span class="st">"index"</span>, newdata <span class="op">=</span> <span class="va">nd</span><span class="op">)</span>   <span class="co"># does the choice move the index?</span></span>
+<span><span class="fu"><a href="reference/best_candidate.html">best_candidate</a></span><span class="op">(</span><span class="va">sel</span><span class="op">)</span>                  <span class="co"># by the metric column, never by row order</span></span></code></pre></div>
+<p>Cross-validate a <strong>shortlist</strong>, not the whole ladder — CV costs <code>k</code> fits per candidate:</p>
+<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">short</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/best_candidate.html">best_candidate</a></span><span class="op">(</span><span class="va">sel</span>, n <span class="op">=</span> <span class="fl">3</span>, by <span class="op">=</span> <span class="st">"aic"</span><span class="op">)</span></span>
+<span><span class="va">cv</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/sdmTMB_selection.html">sdmTMB_selection</a></span><span class="op">(</span><span class="va">cands</span><span class="op">[</span><span class="va">short</span><span class="op">]</span>, data <span class="op">=</span> <span class="va">pcod</span>, <span class="va">...</span>, cv <span class="op">=</span> <span class="fl">10</span>,</span>
+<span>                       cache_dir <span class="op">=</span> <span class="st">"data/output/selection"</span><span class="op">)</span></span></code></pre></div>
+<p>Rules that make the table mean something (all enforced or reported by the function; see <code><a href="reference/sdmTMB_selection.html">?sdmTMB_selection</a></code>):</p>
+<ul><li>Candidates are fitted to <strong>identical records</strong> (<code>complete_cases = TRUE</code>, via <code><a href="reference/selection_frame.html">selection_frame()</a></code>). Fit the <em>selected</em> specification to the full data afterwards.</li>
+<li>Compare only rows with <code>comparable == TRUE</code>, and never quote a delta between two candidates unless both are.</li>
+<li>Hold-out log-likelihood is reported <strong>per observation</strong>, with <code>n_heldout</code> and <code>folds_pdhess</code> beside it.</li>
+<li>
+<code>fold_ids</code> from <code><a href="https://rdrr.io/pkg/blockCV/man/cv_spatial.html" class="external-link">blockCV::cv_spatial()</a></code> gives spatially clustered folds (extrapolation into unsampled ground); the default random folds measure interpolation. <code>lfo = TRUE</code> scores prediction of unseen <em>years</em>, which is what an assessment update actually asks.</li>
+</ul></div>
+<div class="section level3">
 <h3 id="survey-comparison-uses-the-bundled-sebastes-data">Survey comparison (uses the bundled <code>sebastes</code> data)<a class="anchor" aria-label="anchor" href="#survey-comparison-uses-the-bundled-sebastes-data"></a></h3>
 <p><code><a href="reference/compare_surveys.html">compare_surveys()</a></code> fits a separate model per survey series, builds a survey-specific prediction grid from each survey’s spatial footprint, and compares to a compiled reference index.</p>
-<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/data.html" class="external-link">data</a></span><span class="op">(</span><span class="va">sebastes</span><span class="op">)</span></span>
 <span><span class="va">region</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/make_survey_prediction_region.html">make_survey_prediction_region</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/subset.html" class="external-link">subset</a></span><span class="op">(</span><span class="va">sebastes</span>, <span class="va">cruiseseries</span> <span class="op">==</span> <span class="st">"EggaN"</span><span class="op">)</span>,</span>
 <span>                                        crs <span class="op">=</span> <span class="fl">32633</span><span class="op">)</span></span>
@@ -104,6 +140,10 @@
 <strong>Bias correction is slow.</strong> <code>bias_correct = FALSE</code> is the default; turn it on only for final runs.</li>
 <li>
 <strong><code>compare_surveys(type = "spatial")</code></strong> needs a <code>compiled_model</code>; without one, spatial differences are skipped.</li>
+<li>
+<strong>Do not read the selected model off the first table row.</strong> Use <code><a href="reference/best_candidate.html">best_candidate()</a></code>; the sort key changes with whether cross-validation ran.</li>
+<li>
+<strong>A <code>sanity = FALSE</code> winner is not disqualified.</strong> <code><a href="https://sdmTMB.github.io/sdmTMB/reference/sanity.html" class="external-link">sanity()</a></code> fails routinely on usable fits, so it does not gate <code>comparable</code> — read it as a reason to consider simplifying, not as a row to skip.</li>
 </ol></div>
 <div class="section level2">
 <h2 id="where-to-find-more">Where to find more<a class="anchor" aria-label="anchor" href="#where-to-find-more"></a></h2>
@@ -128,7 +168,7 @@
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.1.</p>
 </div>
 
     </footer></div>

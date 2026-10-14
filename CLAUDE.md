@@ -87,6 +87,18 @@ argument names reused from `sdmTMB` (`bias_correct`, `level`, `area`,
 
 ### Function families and S3 classes
 
+- Model selection
+  ([R/model-selection.R](https://deepwaterimr.github.io/sdmTMBexperiments/R/model-selection.R)):
+  [`sdmTMB_selection()`](https://deepwaterimr.github.io/sdmTMBexperiments/reference/sdmTMB_selection.md)
+  → `sdmTMB_selection` (+ `print`/`plot`), built on
+  [`selection_frame()`](https://deepwaterimr.github.io/sdmTMBexperiments/reference/selection_frame.md)
+  (identical records),
+  [`sdmTMB_cv_summary()`](https://deepwaterimr.github.io/sdmTMBexperiments/reference/sdmTMB_cv_summary.md)
+  (per-observation hold-out log-likelihood),
+  [`add_aic_weights()`](https://deepwaterimr.github.io/sdmTMBexperiments/reference/add_aic_weights.md)
+  and
+  [`best_candidate()`](https://deepwaterimr.github.io/sdmTMBexperiments/reference/best_candidate.md)
+  (look the winner up in the column, never by row position).
 - Comparisons return `sdmTMB_model_comparison`,
   `sdmTMB_mesh_comparison`, `sdmTMB_survey_comparison`, each with a
   [`plot()`](https://rdrr.io/r/graphics/plot.default.html) method (index

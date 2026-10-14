@@ -79,7 +79,8 @@
 </ul></div>
 <div class="section level3">
 <h3 id="function-families-and-s3-classes">Function families and S3 classes<a class="anchor" aria-label="anchor" href="#function-families-and-s3-classes"></a></h3>
-<ul><li>Comparisons return <code>sdmTMB_model_comparison</code>, <code>sdmTMB_mesh_comparison</code>, <code>sdmTMB_survey_comparison</code>, each with a <code><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot()</a></code> method (index / spatial, and scatter for surveys).</li>
+<ul><li>Model selection (<a href="R/model-selection.R">R/model-selection.R</a>): <code><a href="reference/sdmTMB_selection.html">sdmTMB_selection()</a></code> → <code>sdmTMB_selection</code> (+ <code>print</code>/<code>plot</code>), built on <code><a href="reference/selection_frame.html">selection_frame()</a></code> (identical records), <code><a href="reference/sdmTMB_cv_summary.html">sdmTMB_cv_summary()</a></code> (per-observation hold-out log-likelihood), <code><a href="reference/add_aic_weights.html">add_aic_weights()</a></code> and <code><a href="reference/best_candidate.html">best_candidate()</a></code> (look the winner up in the column, never by row position).</li>
+<li>Comparisons return <code>sdmTMB_model_comparison</code>, <code>sdmTMB_mesh_comparison</code>, <code>sdmTMB_survey_comparison</code>, each with a <code><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot()</a></code> method (index / spatial, and scatter for surveys).</li>
 <li>
 <code><a href="reference/sdmTMB_retro.html">sdmTMB_retro()</a></code> → <code>sdmTMB_retro</code> (+ <code>plot</code>); <code><a href="reference/sdmTMB_mesh_cv.html">sdmTMB_mesh_cv()</a></code> → <code>sdmTMB_mesh_cv</code> (+ <code>plot</code>).</li>
 <li>
@@ -111,7 +112,7 @@
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.1.</p>
 </div>
 
     </footer></div>

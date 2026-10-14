@@ -1,5 +1,92 @@
 # Changelog
 
+## sdmTMBexperiments (development version)
+
+### Model selection
+
+A set of functions for building defensible model-selection tables,
+ported from two survey- and CPUE-index workflows:
+
+- [`sdmTMB_selection()`](https://deepwaterimr.github.io/sdmTMBexperiments/reference/sdmTMB_selection.md)
+  fits a named list of candidate specifications to identical records and
+  returns a tidy table: the full specification of each candidate, its
+  crash/convergence/sanity status, in-sample NLL and AIC with delta-AIC
+  and Akaike weights, and — with `cv` — cross-validated predictive
+  skill. One function covers component ranking, dropping fixed effects,
+  family selection, spatiotemporal-structure selection and mesh
+  resolution, since each is the same operation with a different thing
+  varied. Caches one file per candidate (resumable, and `only` lets a
+  long ladder be spread over several R sessions).
+- [`selection_frame()`](https://deepwaterimr.github.io/sdmTMBexperiments/reference/selection_frame.md)
+  builds the complete-case frame that makes those columns comparable in
+  the first place: candidates that use different covariates otherwise
+  get silently fitted to different subsets of the data.
+- [`sdmTMB_cv_summary()`](https://deepwaterimr.github.io/sdmTMBexperiments/reference/sdmTMB_cv_summary.md)
+  summarises an
+  [`sdmTMB::sdmTMB_cv()`](https://sdmTMB.github.io/sdmTMB/reference/sdmTMB_cv.html)
+  run **per held-out observation** rather than summed over folds, and
+  reports `folds_pdhess` and `n_heldout` so a fragile row is visible as
+  such. A summed hold-out log-likelihood rewards whichever candidate
+  scored fewest points.
+- [`best_candidate()`](https://deepwaterimr.github.io/sdmTMBexperiments/reference/best_candidate.md)
+  looks the winner up in the metric column rather than by row position,
+  skipping rows the table marks as not comparable. Also builds a
+  cross-validation shortlist from an AIC ladder (`n`).
+- [`add_aic_weights()`](https://deepwaterimr.github.io/sdmTMBexperiments/reference/add_aic_weights.md)
+  adds `deltaAIC`/`AICweight` to any table with an `AIC` column, with a
+  `group` argument for tables that mix models fitted to different
+  response data (where a common weight would be meaningless).
+- [`plot()`](https://rdrr.io/r/graphics/plot.default.html) methods:
+  `type = "selection"` is a status-coded dot plot of the ranking;
+  `type = "index"` overlays the survey index each candidate produces,
+  which answers the question a selection table cannot — whether the
+  choice actually moves the index.
+
+### Plotting
+
+- [`plot_mesh()`](https://deepwaterimr.github.io/sdmTMBexperiments/reference/plot_mesh.md)
+  gains `land_col`, `lon_interval`/`lat_interval`, `utm_axes` and
+  `zero_col`/`zero_size`/`zero_alpha`. **All default to the previous
+  behaviour**, so existing figures are unchanged.
+  - `utm_axes = TRUE` labels the axes in projected kilometres — the
+    units the model actually fits in — instead of degrees. The breaks
+    are explicit numeric values derived from the mesh extent; a breaks
+    *function* is evaluated against the panel range rather than the
+    `coord_sf()` graticule and bunches every label into one corner.
+  - `zero_col` draws stations whose `value` is zero as small faint
+    crosses beneath the sized points. Without it they are invisible,
+    because `scale_size_area()` maps zero to zero area — yet in a survey
+    dataset the zeros are usually the majority of the stations and carry
+    the absence information. They are drawn small and faint by default
+    for the same reason.
+
+### Fixes
+
+- `.safe_index()` (used by
+  [`compare_models()`](https://deepwaterimr.github.io/sdmTMBexperiments/reference/compare_models.md),
+  [`compare_meshes()`](https://deepwaterimr.github.io/sdmTMBexperiments/reference/compare_meshes.md),
+  [`compare_surveys()`](https://deepwaterimr.github.io/sdmTMBexperiments/reference/compare_surveys.md),
+  [`sdmTMB_retro()`](https://deepwaterimr.github.io/sdmTMBexperiments/reference/sdmTMB_retro.md)
+  and the new selection index plot) now survives a *failed index
+  extraction*, not only a failed fit.
+  [`get_index_split()`](https://sdmTMB.github.io/sdmTMB/reference/get_index.html)
+  can throw for a model that fitted perfectly well — a `newdata` grid
+  that does not overlap the fitted coordinates, a year in the grid but
+  not in the model, a split landing on an empty subset — and because
+  these functions summarise many models in one figure at the end of a
+  multi-hour render, one unlucky model used to take the whole plot with
+  it. It is now warned about (naming the model where the caller supplies
+  a label) and returned as a `type = "crashed"` row.
+- [`sdmTMB_selection()`](https://deepwaterimr.github.io/sdmTMBexperiments/reference/sdmTMB_selection.md)
+  handles delta families: the table has exactly one row per candidate (a
+  delta family’s two-element `family$family` no longer recycles the
+  row), and the `family` column and `spec` string use sdmTMB’s
+  `clean_name`
+  (e.g. `delta_gamma(link1 = 'log', link2 = 'log', type = 'poisson-link')`)
+  instead of the first component’s family, which labelled a Poisson-link
+  delta fit as “binomial”. Non-delta families are unchanged
+  (e.g. “tweedie”).
+
 ## sdmTMBexperiments 0.1.0
 
 First release. Experimental helper functions for fitted
