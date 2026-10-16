@@ -37,7 +37,8 @@ test_that("sdmTMB_retro peel 0 reproduces the original fit and index", {
                tolerance = 1e-6)
   expect_equal(rt[[1]]$model$model$par, f$fit$model$par, tolerance = 1e-4)
   idx <- suppressMessages(
-    sdmTMB::get_index_split(f$fit, newdata = f$nd, nsplit = 3, silent = TRUE)
+    sdmTMB::get_index_split(f$fit, newdata = f$nd, nsplit = 3, bias_correct = FALSE,
+                            silent = TRUE)
   )
   expect_equal(rt[[1]]$index$est, idx$est, tolerance = 1e-4)
   # the second peel drops the terminal year
@@ -55,7 +56,8 @@ test_that("compare_meshes reproduces the original fit and index", {
   expect_equal(as.numeric(logLik(mc$models[["25"]])),
                as.numeric(logLik(f$fit)), tolerance = 1e-6)
   idx <- suppressMessages(
-    sdmTMB::get_index_split(f$fit, newdata = f$nd, nsplit = 3, silent = TRUE)
+    sdmTMB::get_index_split(f$fit, newdata = f$nd, nsplit = 3, bias_correct = FALSE,
+                            silent = TRUE)
   )
   ref_idx <- mc$index[mc$index$cutoff == "Reference", ]
   expect_equal(ref_idx$est, idx$est, tolerance = 1e-4)
