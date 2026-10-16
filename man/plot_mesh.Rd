@@ -9,6 +9,13 @@ plot_mesh(
   crs,
   data = NULL,
   value = NULL,
+  zero_col = NULL,
+  zero_size = 0.25,
+  zero_alpha = 0.1,
+  land_col = NULL,
+  lon_interval = NULL,
+  lat_interval = NULL,
+  utm_axes = FALSE,
   xy_cols = c("X", "Y"),
   coord_multiplier = 1000,
   base_size = 11
@@ -25,7 +32,26 @@ basemap.}
 (see \code{xy_cols}), plotted as red points.}
 
 \item{value}{Optional character naming a column in \code{data} used to scale the
-point sizes.}
+point sizes. Note that \code{\link[ggplot2:scale_size_area]{ggplot2::scale_size_area()}} maps a zero to zero
+area, so stations with no catch become invisible; see \code{zero_col}.}
+
+\item{zero_col}{Optional colour for stations where \code{value} is zero, drawn as
+small crosses beneath the sized points. \code{NULL} (default) omits them, which
+preserves the behaviour of earlier versions. Zeros usually outnumber the
+positive stations by an order of magnitude, so they are drawn small and
+faint (see \code{zero_size} and \code{zero_alpha}) to avoid burying the response.}
+
+\item{zero_size, zero_alpha}{Size and alpha of the \code{zero_col} crosses.}
+
+\item{land_col}{Optional land fill passed to \code{\link[ggOceanMaps:basemap]{ggOceanMaps::basemap()}}.
+\code{NULL} (default) uses the basemap default.}
+
+\item{lon_interval, lat_interval}{Optional graticule intervals in degrees,
+passed to \code{\link[ggOceanMaps:basemap]{ggOceanMaps::basemap()}}. \code{NULL} (default) lets basemap decide.}
+
+\item{utm_axes}{Logical. If \code{TRUE}, label the axes in projected kilometres
+(the units the model actually uses) rather than in degrees. Default
+\code{FALSE}, which preserves the behaviour of earlier versions.}
 
 \item{xy_cols}{Character vector of the coordinate columns in \code{data}. Default
 \code{c("X", "Y")}.}

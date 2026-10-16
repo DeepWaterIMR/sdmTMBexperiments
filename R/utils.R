@@ -322,14 +322,24 @@
 #' Safely calculate a split survey index for one model
 #'
 #' Wraps [sdmTMB::get_index_split()] with a graceful fallback for models that
-#' failed to fit (returned a `try-error` or `NULL`), and appends a coefficient
-#' of variation (`cv`) column.
+#' failed to fit (returned a `try-error` or `NULL`) **or whose index extraction
+#' itself fails**, and appends a coefficient of variation (`cv`) column.
+#'
+#' The second case matters as much as the first. Index extraction can throw for
+#' a model that fitted perfectly well -- a `newdata` grid that does not overlap
+#' the fitted coordinates, a year present in the grid but not in the model, a
+#' split that lands on an empty subset -- and these functions are called from
+#' plots that summarise many models at once, at the end of renders measured in
+#' hours. One unlucky model should cost its own row, not the whole figure, so
+#' the failure is warned about (with the model's name where the caller supplies
+#' one) and returned as a `type = "crashed"` row rather than propagated.
 #'
 #' @param mod A fitted sdmTMB model, a `try-error`, or `NULL`.
 #' @param newdata Prediction grid data frame.
 #' @param time_col Name of the time column (used for the crashed fallback).
 #' @param nsplit,bias_correct,level,area,silent,predict_args Passed to
 #'   [sdmTMB::get_index_split()].
+#' @param label Optional model name, used in the warning when extraction fails.
 #' @return A data frame with the index and a `cv` column. The time column is
 #'   always named `year`, whatever the model's time column is called, so that
 #'   the plotting methods and [mohns_rho()] can rely on it.
@@ -344,23 +354,37 @@
   level,
   area,
   silent,
-  predict_args = list()
+  predict_args = list(),
+  label = NULL
 ) {
   if (is.null(mod) || inherits(mod, "try-error")) {
     return(.crashed_index(unique(newdata[[time_col]])))
   }
-  idx <- suppressMessages(
-    sdmTMB::get_index_split(
-      obj = mod,
-      newdata = newdata,
-      nsplit = nsplit,
-      bias_correct = bias_correct,
-      level = level,
-      area = area,
-      silent = silent,
-      predict_args = predict_args
-    )
+  idx <- try(
+    suppressMessages(
+      sdmTMB::get_index_split(
+        obj = mod,
+        newdata = newdata,
+        nsplit = nsplit,
+        bias_correct = bias_correct,
+        level = level,
+        area = area,
+        silent = silent,
+        predict_args = predict_args
+      )
+    ),
+    silent = TRUE
   )
+  if (inherits(idx, "try-error")) {
+    warning(
+      "Index extraction failed for ",
+      if (is.null(label)) "one model" else paste0("'", label, "'"), ": ",
+      conditionMessage(attr(idx, "condition")),
+      " -- returning a crashed index row for it.",
+      call. = FALSE
+    )
+    return(.crashed_index(unique(newdata[[time_col]])))
+  }
   names(idx)[names(idx) == time_col] <- "year"
   idx$cv <- sqrt(exp(idx$se^2) - 1)
   idx
@@ -748,10 +772,10 @@
 #' @param base_size Base font size.
 #' @keywords internal
 #' @noRd
-.basemap <- function(data, crs, base_size = 11) {
+.basemap <- function(data, crs, base_size = 11, ...) {
   if (requireNamespace("ggOceanMaps", quietly = TRUE)) {
     .attach_ggOceanMaps()
-    return(ggOceanMaps::basemap(data, crs = crs, base_size = base_size))
+    return(ggOceanMaps::basemap(data, crs = crs, base_size = base_size, ...))
   }
   ggplot2::ggplot() +
     ggplot2::geom_sf(data = data, alpha = 0, inherit.aes = FALSE) +
