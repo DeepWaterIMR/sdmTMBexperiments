@@ -29,8 +29,10 @@
 
 \item{unit}{Character. Unit label. If \code{NA}, \code{"Index value"} is used.}
 
-\item{mohn}{Logical. Annotate the index plot with Mohn's rho (via
-\code{\link[=mohns_rho]{mohns_rho()}})? Default \code{FALSE}. Only applies when \code{type = "index"}.}
+\item{mohn}{Logical. Annotate the index plot with the mean terminal-year
+relative difference from the reference (computed with \code{\link[=mohns_rho]{mohns_rho()}})?
+Default \code{FALSE}. Only applies when \code{type = "index"}. All series share the
+same final year here, so this is not a retrospective Mohn's rho.}
 
 \item{cutoff_label}{Character. Label for the cutoff colour/fill legend.
 Default \code{"Cutoff"}.}
@@ -58,8 +60,9 @@ A \code{ggplot} object (\code{type = "index"}) or a \code{cowplot} grid
 }
 \description{
 Plots survey index time series from a mesh cutoff comparison (reference in
-black, alternative cutoffs in colour, with Mohn's rho annotated), or spatial
-maps of prediction differences on a \code{\link[ggOceanMaps:basemap]{ggOceanMaps::basemap()}}.
+black, alternative cutoffs in colour, optionally annotated with the
+terminal-year relative difference), or spatial maps of prediction
+differences on a \code{\link[ggOceanMaps:basemap]{ggOceanMaps::basemap()}}.
 }
 \details{
 For \code{type = "spatial"}, each grid cell is compared between a model fitted

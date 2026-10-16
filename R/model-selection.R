@@ -517,7 +517,7 @@ sdmTMB_selection <- function(
     t1 <- Sys.time()
     cvout <- if (need_cv) {
       old_plan <- .setup_parallel(n_workers)
-      on.exit(future::plan(old_plan), add = TRUE)
+      on.exit(.restore_parallel(old_plan), add = TRUE)
       try(do.call(sdmTMB::sdmTMB_cv, c(fit_args, list(
         k_folds = k_folds, fold_ids = fold_ids, lfo = lfo,
         lfo_forecast = lfo_forecast, lfo_validations = lfo_validations,

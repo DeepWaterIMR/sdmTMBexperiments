@@ -21,8 +21,8 @@ be adopted into `sdmTMB`.
 The functions may be freely reused. Figures are made using
 [ggplot2](https://ggplot2.tidyverse.org/reference/), and can be modified
 using ggplot syntax. Maps are drawn on
-[ggOceanMaps](https://mikkovihtakari.github.io/ggOceanMaps/) basemaps.
-The functions in this package are experimental and likely contain bugs.
+[ggOceanMaps](https://mikkovihtakari.github.io/ggOceanMaps/) basemaps
+when that package is installed. The functions in this package are experimental and likely contain bugs.
 If you spot one, please file an issue or commit a PR.
 
 📖 **[Documentation and full
@@ -44,11 +44,6 @@ remotes::install_github("DeepWaterIMR/sdmTMBexperiments")
 
 ``` r
 library(sdmTMBexperiments)
-#> Loading required package: ggOceanMaps
-#> Loading required package: ggplot2
-#> ggOceanMaps: Using ~/Documents/ggOceanMapsLargeData as data download
-#> folder. This folder is customly defined and does not require
-#> downloading the detailed map data again.
 library(sdmTMB)
 
 mesh <- make_mesh(pcod, c("X", "Y"), cutoff = 20)

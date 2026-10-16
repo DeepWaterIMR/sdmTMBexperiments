@@ -3,16 +3,21 @@
 #' @description
 #' Refits an sdmTMB model using a range of mesh cutoff values and compares the
 #' resulting survey indices and predictions to the original (reference) model.
-#' Useful for assessing the sensitivity of an index to mesh resolution.
+#' Useful for assessing the sensitivity of an index to mesh resolution. All
+#' model settings are inherited from the original call of the fitted `object`
+#' (as with [sdmTMB::update.sdmTMB()]); only `mesh` is replaced.
 #'
 #' @param object A fitted model from [sdmTMB::sdmTMB()].
 #' @param mesh_cutoffs Numeric vector of mesh cutoff values (in the units of the
 #'   model coordinates, typically km) to compare.
 #' @param newdata A data frame for predictions, with the same predictor columns
 #'   as the fitted data and a time column matching the fitted data. Must contain
-#'   `X` and `Y` columns.
+#'   the model's coordinate columns (`object$spde$xy_cols`).
 #' @param object_crs Coordinate reference system for the model data. If `NULL`
 #'   (default), extracted from the model's mesh.
+#' @param coord_multiplier Numeric factor to convert the model coordinates to
+#'   CRS units for the spatial maps. Default `1000` (coordinates in km, CRS in
+#'   m); use `1` for coordinates already in CRS units.
 #' @param bias_correct Logical. Apply bias correction via [TMB::sdreport()]?
 #'   Default `FALSE`.
 #' @param level Numeric. Confidence level for index intervals. Default `0.95`.
@@ -21,7 +26,9 @@
 #' @param save_models Logical. Retain fitted model objects in the output? Default
 #'   `FALSE`.
 #' @param silent Logical. Suppress model output? Default `TRUE`.
-#' @param n_workers Integer. Number of parallel workers. Default `1`.
+#' @param n_workers Integer. Number of parallel workers. Default `1`, which
+#'   uses whatever [future::plan()] is currently set. Values `> 1` set a
+#'   temporary `future::multisession` plan.
 #' @param nsplit Integer. Number of splits for [sdmTMB::get_index_split()].
 #'   Default `3`.
 #' @param future_seed Logical or integer. Future-compatible random seed for
@@ -30,8 +37,15 @@
 #'   Default `"Reference"`.
 #'
 #' @return An object of class `sdmTMB_mesh_comparison`, a list with `index`,
-#'   `pred_diff` (and optionally `models`). Carries `crs` and `reference_name`
+#'   `pred_diff` (and optionally `models`). The time column of `index` is
+#'   always named `year`. Coordinates in `pred_diff` are returned as `X` and
+#'   `Y` columns. Carries `crs`, `coord_multiplier` and `reference_name`
 #'   attributes.
+#'
+#' @details
+#' The alternative meshes are built with [sdmTMB::make_mesh()]. If `object`
+#' uses a barrier mesh, the alternatives have no barrier and a warning is
+#' given, since the comparison then mixes cutoff and barrier effects.
 #'
 #' @author Mikko Vihtakari
 #' @seealso [sdmTMB::sdmTMB()], [sdmTMB::get_index_split()],
@@ -58,6 +72,7 @@ compare_meshes <- function(
   mesh_cutoffs,
   newdata,
   object_crs = NULL,
+  coord_multiplier = 1000,
   bias_correct = FALSE,
   level = 0.95,
   area = 1,
@@ -71,14 +86,13 @@ compare_meshes <- function(
   if (!inherits(object, "sdmTMB")) {
     stop("`object` must be a fitted sdmTMB model.")
   }
-  if (!all(c("X", "Y") %in% names(newdata))) {
-    stop("`newdata` must contain `X` and `Y` columns matching the model coordinates.")
+  xy_cols <- object$spde$xy_cols
+  if (!all(xy_cols %in% names(newdata))) {
+    stop("`newdata` must contain the model coordinate columns ",
+         paste(xy_cols, collapse = ", "), ".")
   }
 
   dt <- object$data
-  if (!all(c("X", "Y") %in% names(dt))) {
-    stop("The model data must contain `X` and `Y` columns.")
-  }
 
   if (is.null(object_crs)) {
     mesh_crs <- object$spde$mesh$crs
@@ -91,13 +105,17 @@ compare_meshes <- function(
     object_crs <- sf::st_crs(mesh_crs)
   }
 
-  old_plan <- .setup_parallel(n_workers)
-  on.exit(future::plan(old_plan), add = TRUE)
+  .warn_barrier_dropped(object$spde, "the alternative cutoff meshes")
+
+  # Evaluated on the main process so the arguments reach the workers
+  refit_args <- .refit_args(object)
+
+  old_parallel <- .setup_parallel(n_workers)
+  on.exit(.restore_parallel(old_parallel), add = TRUE)
 
   # Meshes (alternative cutoffs + the original as reference) ------------------
   meshes <- lapply(mesh_cutoffs, function(k) {
-    if (is.integer(future_seed)) set.seed(future_seed)
-    sdmTMB::make_mesh(dt, xy_cols = c("X", "Y"), cutoff = k)
+    sdmTMB::make_mesh(dt, xy_cols = xy_cols, cutoff = k)
   })
   names(meshes) <- mesh_cutoffs
   meshes <- c(meshes, stats::setNames(list(object$spde), reference_name))
@@ -106,21 +124,13 @@ compare_meshes <- function(
   mmods <- future.apply::future_lapply(
     seq_along(meshes),
     function(j) {
-      try(
-        sdmTMB::sdmTMB(
-          formula = if (length(object$formula) > 1) object$formula else object$formula[[1]],
-          data = dt,
-          mesh = meshes[[j]],
-          time = object$time,
-          offset = object$offset,
-          family = object$family,
-          spatial = lapply(object$spatial, function(g) g),
-          spatiotemporal = lapply(object$spatiotemporal, function(g) g),
-          control = object$control,
-          silent = silent
-        ),
+      out <- try(
+        .refit(refit_args, data = dt, mesh = meshes[[j]],
+               rows = seq_len(nrow(dt)), silent = silent),
         silent = TRUE
       )
+      .report_fit(out, paste("cutoff", names(meshes)[j]))
+      out
     },
     future.seed = future_seed
   )
@@ -145,7 +155,7 @@ compare_meshes <- function(
         .data$cutoff,
         levels = unique(c(
           reference_name,
-          sort(suppressWarnings(as.integer(unique(.data$cutoff))))
+          sort(suppressWarnings(as.numeric(unique(.data$cutoff))))
         ))
       )
     )
@@ -153,21 +163,26 @@ compare_meshes <- function(
   # Prediction grid differences ----------------------------------------------
   ref_mod <- mmods[[reference_name]]
   alt <- mmods[!names(mmods) %in% reference_name]
+  ref_failed <- inherits(ref_mod, "try-error")
+  if (ref_failed) {
+    warning("The reference model refit failed, so no prediction differences ",
+            "can be computed.", call. = FALSE)
+  }
 
   pred_diff <- future.apply::future_lapply(
     seq_along(alt),
     function(i) {
       k <- alt[[i]]
       cutoff_name <- names(alt)[i]
-      if (inherits(k, "try-error")) {
+      if (ref_failed || inherits(k, "try-error")) {
         return(data.frame(
           cutoff = cutoff_name, year = newdata[[object$time]],
-          X = newdata$X, Y = newdata$Y,
+          X = newdata[[xy_cols[1]]], Y = newdata[[xy_cols[2]]],
           depth = if ("depth" %in% names(newdata)) newdata$depth else NA,
           est = NA, ref_est = NA, diff = NA, pr_diff = NA, mean_pr_diff = NA
         ))
       }
-      base <- .pred_diff_base(k, ref_mod, newdata, object$time)
+      base <- .pred_diff_base(k, ref_mod, newdata, object$time, xy_cols)
       base$cutoff <- cutoff_name
       base |>
         dplyr::group_by(.data$cutoff, .data$X, .data$Y) |>
@@ -190,6 +205,7 @@ compare_meshes <- function(
   }
   class(out) <- "sdmTMB_mesh_comparison"
   attributes(out)$crs <- object_crs
+  attributes(out)$coord_multiplier <- coord_multiplier
   attributes(out)$reference_name <- reference_name
   out
 }
@@ -198,8 +214,9 @@ compare_meshes <- function(
 #'
 #' @description
 #' Plots survey index time series from a mesh cutoff comparison (reference in
-#' black, alternative cutoffs in colour, with Mohn's rho annotated), or spatial
-#' maps of prediction differences on a [ggOceanMaps::basemap()].
+#' black, alternative cutoffs in colour, optionally annotated with the
+#' terminal-year relative difference), or spatial maps of prediction
+#' differences on a [ggOceanMaps::basemap()].
 #'
 #' @details
 #' For `type = "spatial"`, each grid cell is compared between a model fitted
@@ -227,8 +244,10 @@ compare_meshes <- function(
 #' @param type Character. `"index"` (default) or `"spatial"`.
 #' @param index_divisor Optional numeric divisor applied to index values.
 #' @param unit Character. Unit label. If `NA`, `"Index value"` is used.
-#' @param mohn Logical. Annotate the index plot with Mohn's rho (via
-#'   [mohns_rho()])? Default `FALSE`. Only applies when `type = "index"`.
+#' @param mohn Logical. Annotate the index plot with the mean terminal-year
+#'   relative difference from the reference (computed with [mohns_rho()])?
+#'   Default `FALSE`. Only applies when `type = "index"`. All series share the
+#'   same final year here, so this is not a retrospective Mohn's rho.
 #' @param cutoff_label Character. Label for the cutoff colour/fill legend.
 #'   Default `"Cutoff"`.
 #' @param viridis Logical. Use the viridis palette for cutoff levels? If `FALSE`
@@ -293,7 +312,7 @@ plot.sdmTMB_mesh_comparison <- function(
 
     n_other <- length(unique(dat$cutoff)) - 1
     index_colors <- if (viridis) {
-      c("black", viridis::viridis(n_other))
+      c("black", scales::viridis_pal()(n_other))
     } else {
       c("black", .safe_brewer(n_other, "Set1"))
     }
@@ -313,7 +332,11 @@ plot.sdmTMB_mesh_comparison <- function(
     if (isTRUE(mohn)) {
       rho <- mohns_rho(dat, group_col = "cutoff",
                        reference = attributes(x)$reference_name)
-      rho_lab <- data.frame(label = paste("Mohn's rho = ", round(rho, 3)))
+      # Every series ends in the same year, so this is the (mean) relative
+      # difference in the terminal year, not a retrospective Mohn's rho
+      rho_lab <- data.frame(
+        label = paste("Terminal-year rel. diff. =", round(rho, 3))
+      )
       p <- p + ggplot2::geom_text(
         data = rho_lab, ggplot2::aes(-Inf, Inf, label = .data$label),
         vjust = 2, hjust = -0.25, size = base_size / 2.845276,
@@ -344,6 +367,7 @@ plot.sdmTMB_mesh_comparison <- function(
           transform_color_scale = transform_color_scale,
           limit_rounding = limit_rounding, break_rounding = break_rounding,
           base_size = base_size,
+          coord_multiplier = .coord_multiplier(x),
           title = paste("Cutoff:", names(x$pred_diff)[i], "vs",
                         attributes(x)$reference_name)
         )

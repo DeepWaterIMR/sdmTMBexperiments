@@ -1,3 +1,103 @@
+# sdmTMBexperiments 0.1.4
+
+2026-10-16 Merge the refit, `xy_cols` and dependency fixes with the model-selection functions.
+
+## New features
+
+- New `sebastes_bathy` dataset (a ~45 KB coarse ETOPO 2022 depth raster of the
+  `sebastes` study area) and `sebastes_depth()`, a `depth_fun` for
+  `make_prediction_grid()`. The examples, vignette and tests use them so they
+  no longer need the ~85 MB bathymetry download `ggOceanMaps::get_depth()`
+  makes on first use. For demonstration only.
+
+## Bug fixes
+
+- Map helpers no longer fail with `object 'dd_land' not found` when
+  ggOceanMaps is loaded but not attached (as in vignettes, tests and CI);
+  ggOceanMaps is now attached for the duration of the call. The depth
+  download in `make_prediction_grid()` also uses a longer timeout (600 s).
+
+- `sdmTMB_retro()`, `compare_meshes()`, `sdmTMB_mesh_cv()` and
+  `compare_surveys()` (with `compiled_model`) now refit models from the
+  original `sdmTMB()` call, as `sdmTMB::update.sdmTMB()` does, instead of
+  rebuilding the call from a handful of fields. Previously settings such as
+  `spatial_varying`, `time_varying`, `extra_time`, `weights`, `priors`,
+  `share_range`, `anisotropy` and `reml` were silently dropped, and
+  `sdmTMB_mesh_cv()` also dropped the offset. The call's arguments are
+  evaluated on the main process so they also reach parallel workers.
+  `compare_surveys()` errors on a numeric `offset`/`weights` vector it cannot
+  subset to the survey data.
+- Coordinate columns are no longer assumed to be `X`/`Y`: fitted models use
+  `object$spde$xy_cols`, and `compare_surveys()` gains an `xy_cols` argument
+  for `compiled_model = NULL`.
+- `compare_surveys()` no longer returns a garbled `sanity` table when one
+  survey model fails to fit; failed fits get a column of `NA`s with the same
+  checks as the others.
+- `plot.sdmTMB_model_comparison()` now always draws the reference model in
+  black, whatever the model names or `reference_model`. Index plots no longer
+  give `NA` colours with more than seven series.
+- Non-integer mesh cutoffs (e.g. `7.5`) are no longer truncated or turned into
+  `NA` by `compare_meshes()` and `sdmTMB_mesh_cv()`.
+- `compare_meshes()` no longer errors when the reference refit fails; it warns
+  and returns `NA` prediction differences.
+- `sdmTMB_retro()` and `compare_surveys()` now accept a numeric `area` vector
+  with one value per row of `newdata`, subsetting it along with the
+  prediction grid.
+- Models with a time column not named `year` now work: index outputs always
+  name their time column `year`, so plots, `mohns_rho()` and failed-fit rows
+  line up.
+- `compare_surveys()`, `compare_models()` and `compare_meshes()` gain a
+  `coord_multiplier` argument (default `1000`, km to m), used for survey
+  footprint clipping and the spatial maps, which previously assumed km.
+- `sdmTMB_mesh_cv()` now takes its default `xy_cols` from the model mesh and
+  errors clearly on the `NA` CRS that `make_mesh()` produces.
+- `sdmTMB_retro(refit_meshes = FALSE)` now keeps a barrier mesh's barrier.
+  `compare_meshes()`, `compare_surveys()`, `sdmTMB_mesh_cv()` and
+  `sdmTMB_retro(refit_meshes = TRUE)` warn that the meshes they build have no
+  barrier.
+- `plot_variance_partitioning()` now only uses components whose SD is a
+  link-scale SD: `sigma_O`, `sigma_E`, random intercepts, and `phi` only for
+  `gaussian()` (identity link) and `lognormal()`. Previously it added `phi`
+  for any family (a dispersion or shape parameter for e.g. Tweedie, Gamma
+  and NB2) and smooth-term SDs, which are not link-scale variances.
+- The index-plot annotation of `plot.sdmTMB_model_comparison()` and
+  `plot.sdmTMB_mesh_comparison()` (`mohn = TRUE`) is now labelled
+  "Terminal-year rel. diff.": all series there end in the same year, so it is
+  not a retrospective Mohn's rho.
+- `plot_prediction_histogram()` divides the observed response by
+  `exp(offset)` for models with an offset, so it is on the same scale as the
+  offset-free grid predictions.
+- `sdmTMB_retro()`'s `predict_args` is now passed on to
+  `sdmTMB::get_index_split()`; it previously had no effect.
+- `plot.sdmTMB_retro()` keeps peels in order with more than ten peels.
+- `plot.sdmTMB_survey_comparison(type = "scatter")` no longer errors for a
+  survey with a flat index, and no longer warns about `.data` in tidyselect.
+- The deprecated `trans` argument of ggplot2 scales is replaced with
+  `transform`; ggplot2 >= 3.5.0 is now required.
+- Failed fits now report the actual error instead of "did not converge", and
+  fits that ran but fail `sdmTMB::sanity()` are flagged.
+
+## Breaking changes
+
+- `sdmTMB_retro(refit_meshes = TRUE)` now requires a `cutoff` argument
+  instead of approximating it from the minimum mesh vertex distance.
+- `sdmTMB_retro()`'s `n_workers` defaults to `1` (was `nyears`). With
+  `n_workers = 1` all functions now use the user's current `future::plan()`
+  instead of forcing a sequential one, and `future.globals.maxSize` is
+  restored on exit.
+- The `%>%` re-export is removed.
+
+## Other changes
+
+- `ggOceanMaps` moves from Depends to Suggests. Spatial plots fall back to a
+  plain map without it; `bubble_map()` and automatic depth extraction in
+  `make_prediction_grid()` require it.
+- `plyr`, `magrittr` and `viridis` are no longer dependencies.
+- `sdmTMB_mesh_cv()` documents AIC across meshes as a rough guide only.
+- `tests/` and `vignettes/` are no longer build-ignored, so `R CMD check` on
+  CI now runs the tests and builds the vignette. New tests check that refits
+  reproduce the original fit.
+
 # sdmTMBexperiments 0.1.3
 
 2026-10-14 Regenerate `plot_mesh.Rd` so its usage lists the new `plot_mesh()` arguments (fixes the R CMD check codoc WARNING).

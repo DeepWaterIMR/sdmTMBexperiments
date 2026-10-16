@@ -9,12 +9,13 @@ sdmTMB_retro(
   newdata,
   nyears = 5,
   refit_meshes = FALSE,
+  cutoff = NULL,
   bias_correct = FALSE,
   level = 0.95,
   area = 1,
   save_models = FALSE,
   silent = TRUE,
-  n_workers = nyears,
+  n_workers = 1,
   nsplit = 3,
   predict_args = list(),
   future_seed = TRUE
@@ -33,8 +34,13 @@ including the terminal (most recent) year. Clamped to the number of fitted
 years available.}
 
 \item{refit_meshes}{Logical. Rebuild the mesh for each peel from the peeled
-data (approximating the original cutoff)? If \code{FALSE} (default) the original
-model mesh is reused unchanged.}
+data using \code{cutoff}? If \code{FALSE} (default) the original model mesh is reused
+unchanged, including any barrier. Rebuilt meshes have no barrier (a
+warning is given if the original mesh has one).}
+
+\item{cutoff}{Numeric. Mesh cutoff (in model coordinate units) used to
+rebuild the meshes when \code{refit_meshes = TRUE}. Required in that case, since
+the original cutoff is not stored in the fitted model.}
 
 \item{bias_correct}{Logical. Apply bias correction via \code{\link[TMB:sdreport]{TMB::sdreport()}}?
 Recommended \code{TRUE} for final analyses, \code{FALSE} (default) while
@@ -51,13 +57,17 @@ the output?}
 
 \item{silent}{Logical. Suppress model fitting output?}
 
-\item{n_workers}{Integer. Number of parallel workers. Defaults to \code{nyears}.
-Set to 1 to run sequentially.}
+\item{n_workers}{Integer. Number of parallel workers. Default \code{1}, which
+uses whatever \code{\link[future:plan]{future::plan()}} is currently set (sequential by default).
+Values \verb{> 1} set a temporary \code{future::multisession} plan with that many
+workers.}
 
 \item{nsplit}{Integer. Number of splits for \code{\link[sdmTMB:get_index_split]{sdmTMB::get_index_split()}}.}
 
-\item{predict_args}{A list of arguments controlling the prediction grid used
-for the index. Currently \code{newdata} is filtered to the peeled years.}
+\item{predict_args}{A list of extra arguments passed to
+\code{\link[sdmTMB:predict.sdmTMB]{sdmTMB::predict.sdmTMB()}} when calculating each peel's index (the
+\code{predict_args} argument of \code{\link[sdmTMB:get_index_split]{sdmTMB::get_index_split()}}), e.g.
+\code{list(re_form_iid = NA)}.}
 
 \item{future_seed}{Logical or integer. Future-compatible random seed for
 parallel processing. See \code{\link[future.apply:future_lapply]{future.apply::future_lapply()}}.}
@@ -71,8 +81,11 @@ model object).
 Runs an analytical retrospective on an index from \code{\link[sdmTMB:sdmTMB]{sdmTMB::sdmTMB()}}. The
 function refits the model for each peel (successively dropping the most recent
 years) and calculates an index for each peel using
-\code{\link[sdmTMB:get_index_split]{sdmTMB::get_index_split()}}. Model settings are inherited from the fitted
-\code{object}.
+\code{\link[sdmTMB:get_index_split]{sdmTMB::get_index_split()}}. All model settings are inherited from the
+original call of the fitted \code{object} (as with \code{\link[sdmTMB:update.sdmTMB]{sdmTMB::update.sdmTMB()}});
+only \code{data} and \code{mesh} are replaced. Arguments of the original call are
+evaluated in the environment of the model formula, so objects referenced
+there (e.g. \code{priors = my_priors}) must still exist.
 }
 \examples{
 \donttest{

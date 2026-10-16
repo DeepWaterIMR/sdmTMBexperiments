@@ -29,8 +29,10 @@
 
 \item{unit}{Character. Unit label for axes. If \code{NA}, \code{"Index value"} is used.}
 
-\item{mohn}{Logical. Annotate the index plot with Mohn's rho (via
-\code{\link[=mohns_rho]{mohns_rho()}})? Default \code{FALSE}. Only applies when \code{type = "index"}.}
+\item{mohn}{Logical. Annotate the index plot with the mean terminal-year
+relative difference from the reference (computed with \code{\link[=mohns_rho]{mohns_rho()}})?
+Default \code{FALSE}. Only applies when \code{type = "index"}. All series share the
+same final year here, so this is not a retrospective Mohn's rho.}
 
 \item{viridis}{Logical. Use the viridis palette for model groups? Default
 \code{FALSE} (a fixed colour vector).}

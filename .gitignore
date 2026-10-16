@@ -9,3 +9,7 @@
 *.Rcheck/
 ^README\.html$
 Rplots.pdf
+/memory/
+CLAUDE.md
+AGENTS.md
+/docs/

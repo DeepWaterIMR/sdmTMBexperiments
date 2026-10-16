@@ -15,21 +15,27 @@
 #'   comparison. Default `1`.
 #' @param object_crs Coordinate reference system for the model data. If `NULL`
 #'   (default), extracted from the first model's mesh when available.
+#' @param coord_multiplier Numeric factor to convert the model coordinates to
+#'   CRS units for the spatial maps. Default `1000` (coordinates in km, CRS in
+#'   m); use `1` for coordinates already in CRS units.
 #' @param bias_correct Logical. Apply bias correction via [TMB::sdreport()]?
 #'   Default `FALSE`.
 #' @param level Numeric. Confidence level for index intervals. Default `0.95`.
 #' @param area Grid cell area for area-weighted index calculation. Passed to
 #'   [sdmTMB::get_index_split()].
 #' @param silent Logical. Suppress model output? Default `TRUE`.
-#' @param n_workers Integer. Number of parallel workers. Default `1`.
+#' @param n_workers Integer. Number of parallel workers. Default `1`, which
+#'   uses whatever [future::plan()] is currently set. Values `> 1` set a
+#'   temporary `future::multisession` plan.
 #' @param nsplit Integer. Number of splits for [sdmTMB::get_index_split()].
 #' @param future_seed Logical or integer. Future-compatible random seed for
 #'   parallel processing. See [future.apply::future_lapply()].
 #'
 #' @return An object of class `sdmTMB_model_comparison`, a list with elements
 #'   `sanity`, `nll`, `index` and `grid` (a list of per-cell prediction-
-#'   difference data frames). Carries `crs`, `reference_model` and `model_names`
-#'   attributes.
+#'   difference data frames). The time column of `index` is always named
+#'   `year`. Carries `crs`, `coord_multiplier`, `reference_model` and
+#'   `model_names` attributes.
 #'
 #' @author Mikko Vihtakari
 #' @seealso [sdmTMB::sdmTMB()], [sdmTMB::get_index_split()],
@@ -58,6 +64,7 @@ compare_models <- function(
   newdata,
   reference_model = 1,
   object_crs = NULL,
+  coord_multiplier = 1000,
   bias_correct = FALSE,
   level = 0.95,
   area = 1,
@@ -87,6 +94,11 @@ compare_models <- function(
   if (missing(newdata)) {
     stop("`newdata` must be provided for predictions.")
   }
+  xy_cols <- models[[reference_model]]$spde$xy_cols
+  if (!all(xy_cols %in% names(newdata))) {
+    stop("`newdata` must contain the model coordinate columns ",
+         paste(xy_cols, collapse = ", "), ".")
+  }
 
   if (is.null(object_crs)) {
     mesh_crs <- models[[1]]$spde$mesh$crs
@@ -98,13 +110,11 @@ compare_models <- function(
     }
   }
 
-  old_plan <- .setup_parallel(n_workers)
-  on.exit(future::plan(old_plan), add = TRUE)
+  old_parallel <- .setup_parallel(n_workers)
+  on.exit(.restore_parallel(old_parallel), add = TRUE)
 
   # Sanity + negative log-likelihood ------------------------------------------
-  model_sanity <- as.data.frame(
-    sapply(models, function(k) sdmTMB::sanity(k, silent = TRUE))
-  )
+  model_sanity <- .sanity_table(models)
   model_nll <- as.data.frame(
     lapply(models, function(k) round(k$model$objective)),
     row.names = "NLL"
@@ -138,11 +148,12 @@ compare_models <- function(
       if (inherits(k, "try-error")) {
         return(data.frame(
           reference_model = ref_name, compared_model = comp_name,
-          year = newdata[[ref_mod$time]], X = newdata$X, Y = newdata$Y,
+          year = newdata[[ref_mod$time]],
+          X = newdata[[xy_cols[1]]], Y = newdata[[xy_cols[2]]],
           est = NA, ref_est = NA, diff = NA, pr_diff = NA, mean_pr_diff = NA
         ))
       }
-      base <- .pred_diff_base(k, ref_mod, newdata, ref_mod$time)
+      base <- .pred_diff_base(k, ref_mod, newdata, ref_mod$time, xy_cols)
       base$reference_model <- ref_name
       base$compared_model <- comp_name
       base |>
@@ -169,6 +180,7 @@ compare_models <- function(
   )
   class(out) <- "sdmTMB_model_comparison"
   attributes(out)$crs <- object_crs
+  attributes(out)$coord_multiplier <- coord_multiplier
   attributes(out)$reference_model <- ref_name
   attributes(out)$model_names <- names(models)
   out
@@ -206,8 +218,10 @@ compare_models <- function(
 #' @param type Character. `"index"` (default) or `"spatial"`.
 #' @param index_divisor Optional numeric divisor applied to index values.
 #' @param unit Character. Unit label for axes. If `NA`, `"Index value"` is used.
-#' @param mohn Logical. Annotate the index plot with Mohn's rho (via
-#'   [mohns_rho()])? Default `FALSE`. Only applies when `type = "index"`.
+#' @param mohn Logical. Annotate the index plot with the mean terminal-year
+#'   relative difference from the reference (computed with [mohns_rho()])?
+#'   Default `FALSE`. Only applies when `type = "index"`. All series share the
+#'   same final year here, so this is not a retrospective Mohn's rho.
 #' @param viridis Logical. Use the viridis palette for model groups? Default
 #'   `FALSE` (a fixed colour vector).
 #' @param spatial_response Character. Column mapped in spatial plots: one of
@@ -274,15 +288,16 @@ plot.sdmTMB_model_comparison <- function(
       )
     }
 
-    n_other <- length(unique(dat$model)) - 1
-    index_colors <- if (viridis) {
-      c("black", viridis::viridis(n_other))
-    } else {
-      c("black", .index_color_vector[seq_len(n_other)])
-    }
+    # Named colours so the reference is black whatever the model names sort to
+    ref <- attributes(x)$reference_model
+    others <- setdiff(attributes(x)$model_names, ref)
+    index_colors <- c(
+      stats::setNames("black", ref),
+      stats::setNames(.series_colors(length(others), viridis), others)
+    )
 
     p <- ggplot2::ggplot(
-        dat,
+        dplyr::mutate(dat, model = factor(.data$model, levels = c(ref, others))),
         ggplot2::aes(
           x = .data$year, y = .data$est, ymin = .data$lwr, ymax = .data$upr,
           color = .data$model, fill = .data$model
@@ -298,7 +313,11 @@ plot.sdmTMB_model_comparison <- function(
     if (isTRUE(mohn)) {
       rho <- mohns_rho(dat, group_col = "model",
                        reference = attributes(x)$reference_model)
-      rho_lab <- data.frame(label = paste("Mohn's rho = ", round(rho, 3)))
+      # Every series ends in the same year, so this is the (mean) relative
+      # difference in the terminal year, not a retrospective Mohn's rho
+      rho_lab <- data.frame(
+        label = paste("Terminal-year rel. diff. =", round(rho, 3))
+      )
       p <- p + ggplot2::geom_text(
         data = rho_lab, ggplot2::aes(-Inf, Inf, label = .data$label),
         vjust = 2, hjust = -0.25, size = base_size / 2.845276,
@@ -333,7 +352,8 @@ plot.sdmTMB_model_comparison <- function(
           transform_color_scale = transform_color_scale,
           limit_rounding = limit_rounding, break_rounding = break_rounding,
           base_size = base_size, title = names(x$grid)[i],
-          fill_prefix = fill_prefix
+          fill_prefix = fill_prefix,
+          coord_multiplier = .coord_multiplier(x)
         )
         if (is_pct_response) {
           fill_lab <- if (is.null(fill_prefix)) {

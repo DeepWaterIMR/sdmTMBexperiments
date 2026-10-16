@@ -29,7 +29,10 @@
 #' data(sebastes)
 #' eggan <- subset(sebastes, cruiseseries == "EggaN")
 #' region <- make_survey_prediction_region(eggan, crs = 32633, concavity = 5)
-#' ggOceanMaps::qmap(region, fill = I(NA))
+#' if (requireNamespace("ggOceanMaps", quietly = TRUE)) {
+#'   library(ggOceanMaps) # qmap() needs ggOceanMaps attached
+#'   qmap(region, fill = I(NA))
+#' }
 #' }
 #' @export
 make_survey_prediction_region <- function(
@@ -137,7 +140,11 @@ make_survey_prediction_region <- function(
 #' # max_depth turns on depth extraction, via ggOceanMaps::get_depth() by
 #' # default (bathy_style controls the bathymetry source); cells outside
 #' # c(1, max_depth) are dropped. plot() then colours by depth automatically.
-#' grid <- make_prediction_grid(region, resolution = 20, max_depth = 1000)
+#' # Here we pass the small bundled demonstration bathymetry as `depth_fun`
+#' # to avoid the large bathymetry download get_depth() needs on first use.
+#' grid <- make_prediction_grid(
+#'   region, resolution = 20, max_depth = 1000, depth_fun = sebastes_depth
+#' )
 #' range(grid$depth)
 #' plot(grid)
 #' }
@@ -168,7 +175,13 @@ make_prediction_grid <- function(
 
   if (!is.null(max_depth)) {
     if (is.null(depth_fun)) {
+      rlang::check_installed("ggOceanMaps", reason = "to extract depths.")
       depth_fun <- function(pts) {
+        .attach_ggOceanMaps()
+        # the continuous bathymetry is an ~85 MB download on first use; the
+        # default 60 s timeout often aborts it
+        op <- options(timeout = max(600, getOption("timeout")))
+        on.exit(options(op), add = TRUE)
         ggOceanMaps::get_depth(pts, bathy.style = bathy_style, bind = FALSE)
       }
     }
@@ -272,7 +285,7 @@ plot.sdmTMB_prediction_grid <- function(
     remove = FALSE
   )
 
-  p <- ggOceanMaps::basemap(d_sf, crs = crs, base_size = base_size)
+  p <- .basemap(d_sf, crs = crs, base_size = base_size)
 
   has_value <- !is.null(value) && value %in% names(d)
   if (has_value) {

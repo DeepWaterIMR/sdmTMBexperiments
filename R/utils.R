@@ -5,28 +5,162 @@
 
 #' Configure a future parallel plan
 #'
-#' Captures the current future plan, installs a new one, and sets a sensible
-#' `future.globals.maxSize`. Returns the previous plan so the caller can restore
-#' it with `on.exit()`.
+#' Captures the current future plan and `future.globals.maxSize`, and sets a
+#' sensible `future.globals.maxSize`. Returns the previous settings so the
+#' caller can restore them with `on.exit(.restore_parallel(old))`.
 #'
-#' A portable `multisession` plan is used for `n_workers > 1` (works on all
-#' platforms, including Windows). Users who want forked (`multicore`) or
-#' cluster workers can set their own plan before calling and pass
-#' `n_workers = 1` to leave it untouched.
+#' The user's own [future::plan()] is respected and left untouched when
+#' `n_workers = 1`. Only when the user explicitly asks for `n_workers > 1` is a
+#' portable `multisession` plan installed (works on all platforms, including
+#' Windows) for the duration of the call. Users who want forked (`multicore`)
+#' or cluster workers can set their own plan before calling and keep
+#' `n_workers = 1`.
 #'
 #' @param n_workers Integer number of workers.
-#' @return The previous future plan.
+#' @return A list with the previous future plan and option value.
 #' @keywords internal
 #' @noRd
 .setup_parallel <- function(n_workers) {
-  old_plan <- future::plan()
+  old <- list(
+    plan = future::plan(),
+    max_size = getOption("future.globals.maxSize")
+  )
   if (n_workers > 1) {
     future::plan(future::multisession, workers = n_workers)
-  } else {
-    future::plan(future::sequential)
   }
   .set_future_memory()
-  old_plan
+  old
+}
+
+#' Restore the settings changed by `.setup_parallel()`
+#'
+#' @param old The list returned by `.setup_parallel()`.
+#' @keywords internal
+#' @noRd
+.restore_parallel <- function(old) {
+  future::plan(old$plan)
+  options(future.globals.maxSize = old$max_size)
+  invisible(NULL)
+}
+
+#' Evaluate the arguments of the original sdmTMB call for refitting
+#'
+#' Starts from `object$call` (as [sdmTMB::update.sdmTMB()] does) so every
+#' argument the user supplied to [sdmTMB::sdmTMB()] (e.g. `spatial_varying`,
+#' `time_varying`, `extra_time`, `weights`, `priors`, `share_range`,
+#' `anisotropy`, `reml`, ...) is carried over to refits. The arguments are
+#' evaluated here, on the main process, because symbols inside a call object
+#' (e.g. `priors = my_priors`) do not exist in a `future` worker and are not
+#' seen by `future`'s globals detection. The result is a plain list that can
+#' be sent to workers and used with `.refit()`.
+#'
+#' `data`, `mesh` and `silent` are supplied later by `.refit()`;
+#' `previous_fit` is dropped since it does not apply to new data/meshes.
+#' `control` is taken from the fitted object (including its backend).
+#'
+#' @param object A fitted sdmTMB model.
+#' @param ... Named arguments that override those of the original call.
+#' @param subset_ok Logical. Will the refits be on (a row subset of)
+#'   `object$data`? If `FALSE`, row-aligned vector arguments (numeric `offset`,
+#'   `weights`) cannot be carried over and an error is thrown.
+#' @param envir Environment in which to evaluate the call's arguments.
+#' @return A named list of arguments for [sdmTMB::sdmTMB()].
+#' @keywords internal
+#' @noRd
+.refit_args <- function(
+  object,
+  ...,
+  subset_ok = TRUE,
+  envir = environment(object$formula[[1]])
+) {
+  if (is.null(envir)) envir <- globalenv()
+  call_args <- as.list(object$call)[-1]
+  call_args <- call_args[!names(call_args) %in%
+    c("data", "mesh", "silent", "control", "previous_fit", "formula")]
+
+  args <- lapply(names(call_args), function(nm) {
+    tryCatch(
+      eval(call_args[[nm]], envir = envir),
+      error = function(e) {
+        stop("Could not evaluate argument `", nm, "` of the original sdmTMB ",
+             "call for refitting: ", conditionMessage(e), call. = FALSE)
+      }
+    )
+  })
+  names(args) <- names(call_args)
+
+  args$formula <- if (length(object$formula) > 1) {
+    object$formula
+  } else {
+    object$formula[[1]]
+  }
+  control <- object$control
+  if (!is.null(object$backend)) control$backend <- object$backend
+  args$control <- control
+
+  overrides <- list(...)
+  for (nm in names(overrides)) args[nm] <- list(overrides[[nm]])
+
+  if (!subset_ok) {
+    for (nm in c("offset", "weights")) {
+      if (is.numeric(args[[nm]])) {
+        stop("The model was fitted with a numeric `", nm, "` vector, which ",
+             "cannot be carried over to new data. Refit the model with `",
+             nm, "` given as a data column", if (nm == "offset") {
+               " or supply `offset_col`"
+             }, ".", call. = FALSE)
+      }
+    }
+  }
+  args
+}
+
+#' Refit an sdmTMB model with new data and mesh, keeping all other settings
+#'
+#' @param args A list from `.refit_args()`.
+#' @param data The new data.
+#' @param mesh The new mesh (built from `data`).
+#' @param rows Logical or integer index of the rows of the original model data
+#'   kept in `data`, used to subset row-aligned vector arguments (numeric
+#'   `offset`, `weights`). Character (column name) offsets are left alone and
+#'   looked up in the new `data`.
+#' @param silent Passed to [sdmTMB::sdmTMB()].
+#' @return A fitted sdmTMB model.
+#' @keywords internal
+#' @noRd
+.refit <- function(args, data, mesh, rows = NULL, silent = TRUE) {
+  for (nm in c("offset", "weights")) {
+    if (is.numeric(args[[nm]]) && !is.null(rows)) {
+      args[[nm]] <- args[[nm]][rows]
+    }
+  }
+  args$data <- data
+  args$mesh <- mesh
+  args$silent <- silent
+  do.call(sdmTMB::sdmTMB, args)
+}
+
+#' Report a failed or suspicious fit
+#'
+#' A `try-error` means the fit errored (not that it failed to converge); report
+#' the actual error. Fits that ran but fail [sdmTMB::sanity()] are flagged
+#' separately.
+#'
+#' @param fit A fitted sdmTMB model or a `try-error`.
+#' @param label Character label used in the message.
+#' @keywords internal
+#' @noRd
+.report_fit <- function(fit, label) {
+  if (inherits(fit, "try-error")) {
+    message("Model for ", label, " failed with error: ",
+            conditionMessage(attr(fit, "condition")),
+            " Adding NAs as index values.")
+  } else if (!isTRUE(all(unlist(
+    suppressMessages(sdmTMB::sanity(fit, silent = TRUE))
+  )))) {
+    message("Model for ", label, " did not pass sdmTMB::sanity() checks.")
+  }
+  invisible(NULL)
 }
 
 #' Set future.globals.maxSize for transferring fitted models to workers
@@ -65,6 +199,9 @@
 
 #' A data frame representing a crashed (non-converged) index
 #'
+#' Has the same columns as a [sdmTMB::get_index_split()] result after
+#' `.safe_index()` has renamed its time column to `year`.
+#'
 #' @param years The years to fill with `NA` index values.
 #' @keywords internal
 #' @noRd
@@ -76,8 +213,110 @@
     upr = NA_real_,
     log_est = NA_real_,
     se = NA_real_,
+    se_natural = NA_real_,
     type = "crashed"
   )
+}
+
+#' Sanity-check table for a set of models
+#'
+#' One column per model and one row per [sdmTMB::sanity()] check. Failed fits
+#' (`try-error` or `NULL`) get a column of `NA`s, with the same check names as
+#' the successful fits.
+#'
+#' @param mods A named list of fitted sdmTMB models and/or `try-error`s.
+#' @return A data frame.
+#' @keywords internal
+#' @noRd
+.sanity_table <- function(mods) {
+  checks <- lapply(mods, function(k) {
+    if (is.null(k) || inherits(k, "try-error")) return(NULL)
+    unlist(sdmTMB::sanity(k, silent = TRUE))
+  })
+  fitted <- !vapply(checks, is.null, logical(1))
+  if (!any(fitted)) {
+    out <- as.data.frame(matrix(NA, nrow = 1, ncol = length(mods)))
+    names(out) <- names(mods)
+    row.names(out) <- "all_ok"
+    return(out)
+  }
+  check_names <- names(checks[[which(fitted)[1]]])
+  out <- lapply(checks, function(x) {
+    if (is.null(x)) stats::setNames(rep(NA, length(check_names)), check_names)
+    else x[check_names]
+  })
+  as.data.frame(out, row.names = check_names, check.names = FALSE)
+}
+
+#' Subset a per-row `area` vector alongside its prediction grid
+#'
+#' @param area A scalar, a column name, or a numeric vector with one value per
+#'   row of the full prediction grid.
+#' @param rows Logical or integer index of the grid rows kept.
+#' @param n Number of rows of the full prediction grid.
+#' @return `area` for the kept rows (scalars and column names unchanged).
+#' @keywords internal
+#' @noRd
+.subset_area <- function(area, rows, n) {
+  if (!is.numeric(area) || length(area) == 1L) return(area)
+  if (length(area) != n) {
+    stop("A numeric `area` vector must have one value per row of `newdata`.",
+         call. = FALSE)
+  }
+  area[rows]
+}
+
+#' The `coord_multiplier` stored on a comparison object
+#'
+#' Objects created before `coord_multiplier` was stored have km coordinates.
+#'
+#' @param x A comparison object.
+#' @keywords internal
+#' @noRd
+.coord_multiplier <- function(x) {
+  cm <- attr(x, "coord_multiplier")
+  if (is.null(cm)) 1000 else cm
+}
+
+#' Does a mesh carry a barrier (from `sdmTMBextra::add_barrier_mesh()`)?
+#'
+#' @param mesh An `sdmTMBmesh` object.
+#' @keywords internal
+#' @noRd
+.has_barrier <- function(mesh) {
+  "spde_barrier" %in% names(mesh)
+}
+
+#' Copy the barrier components of one mesh onto another
+#'
+#' Only valid when both meshes share the same triangulation (e.g. one was
+#' rebuilt from the other's `mesh` for new data), since the barrier components
+#' depend only on the mesh geometry and the barrier polygons.
+#'
+#' @param mesh The `sdmTMBmesh` to add the barrier to.
+#' @param from The `sdmTMBmesh` with a barrier.
+#' @keywords internal
+#' @noRd
+.copy_barrier <- function(mesh, from) {
+  for (nm in c("spde_barrier", "barrier_scaling", "barrier_triangles")) {
+    if (!is.null(from[[nm]])) mesh[[nm]] <- from[[nm]]
+  }
+  mesh
+}
+
+#' Warn that new meshes are built without the model's barrier
+#'
+#' @param mesh The original model's `sdmTMBmesh`.
+#' @param what Character describing which meshes lose the barrier.
+#' @keywords internal
+#' @noRd
+.warn_barrier_dropped <- function(mesh, what) {
+  if (.has_barrier(mesh)) {
+    warning("The model uses a barrier mesh, but ", what, " are built with ",
+            "sdmTMB::make_mesh() and have no barrier. Differences may reflect ",
+            "the barrier as well as the mesh.", call. = FALSE)
+  }
+  invisible(NULL)
 }
 
 #' Safely calculate a split survey index for one model
@@ -98,10 +337,12 @@
 #' @param mod A fitted sdmTMB model, a `try-error`, or `NULL`.
 #' @param newdata Prediction grid data frame.
 #' @param time_col Name of the time column (used for the crashed fallback).
-#' @param nsplit,bias_correct,level,area,silent Passed to
+#' @param nsplit,bias_correct,level,area,silent,predict_args Passed to
 #'   [sdmTMB::get_index_split()].
 #' @param label Optional model name, used in the warning when extraction fails.
-#' @return A data frame with the index and a `cv` column.
+#' @return A data frame with the index and a `cv` column. The time column is
+#'   always named `year`, whatever the model's time column is called, so that
+#'   the plotting methods and [mohns_rho()] can rely on it.
 #' @keywords internal
 #' @noRd
 .safe_index <- function(
@@ -113,6 +354,7 @@
   level,
   area,
   silent,
+  predict_args = list(),
   label = NULL
 ) {
   if (is.null(mod) || inherits(mod, "try-error")) {
@@ -127,7 +369,8 @@
         bias_correct = bias_correct,
         level = level,
         area = area,
-        silent = silent
+        silent = silent,
+        predict_args = predict_args
       )
     ),
     silent = TRUE
@@ -142,6 +385,7 @@
     )
     return(.crashed_index(unique(newdata[[time_col]])))
   }
+  names(idx)[names(idx) == time_col] <- "year"
   idx$cv <- sqrt(exp(idx$se^2) - 1)
   idx
 }
@@ -160,13 +404,16 @@
 #' column is carried through when present in `newdata`.
 #'
 #' @param mod,ref_mod Fitted sdmTMB models.
-#' @param newdata Prediction grid data frame with `X`, `Y` and `time_col`.
+#' @param newdata Prediction grid data frame with `xy_cols` and `time_col`.
 #' @param time_col Name of the time column.
+#' @param xy_cols Names of the coordinate columns in `newdata`. They are
+#'   returned as `X` and `Y`.
 #' @return A data frame with `year`, `X`, `Y`, (`depth`), `est`, `ref_est`,
 #'   `diff` (`est - ref_est`), `pr_diff` (`100 * diff / ref_est`).
 #' @keywords internal
 #' @noRd
-.pred_diff_base <- function(mod, ref_mod, newdata, time_col) {
+.pred_diff_base <- function(mod, ref_mod, newdata, time_col,
+                            xy_cols = c("X", "Y")) {
   nd <- dplyr::filter(
     newdata,
     .data[[time_col]] %in% unique(mod$data[[time_col]])
@@ -185,8 +432,8 @@
 
   out <- data.frame(
     year = nd[[time_col]],
-    X = nd$X,
-    Y = nd$Y,
+    X = nd[[xy_cols[1]]],
+    Y = nd[[xy_cols[2]]],
     est = pred$est,
     ref_est = pred_ref$est,
     diff = pred$est - pred_ref$est,
@@ -354,6 +601,21 @@
   "#056A89"
 )
 
+#' Colours for non-reference index series
+#'
+#' @param n Number of series.
+#' @param viridis Use the viridis palette instead of `.index_color_vector`?
+#' @return `n` colours. `.index_color_vector` is interpolated when `n` exceeds
+#'   its length, so there are never `NA` colours.
+#' @keywords internal
+#' @noRd
+.series_colors <- function(n, viridis = FALSE) {
+  if (n < 1) return(character(0))
+  if (viridis) return(scales::viridis_pal()(n))
+  if (n <= length(.index_color_vector)) return(.index_color_vector[seq_len(n)])
+  grDevices::colorRampPalette(.index_color_vector)(n)
+}
+
 #' Build one spatial prediction-difference map on a ggOceanMaps basemap
 #'
 #' Shared by the `plot()` methods of the model, mesh and survey comparisons.
@@ -378,6 +640,8 @@
 #' @param title Panel title.
 #' @param fill_prefix Optional prefix for the fill legend title, replacing the
 #'   default "Biomass density". `NULL` (default) keeps that default.
+#' @param coord_multiplier Numeric factor to convert `X`/`Y` to CRS units.
+#'   Default `1000` (km to m).
 #' @keywords internal
 #' @noRd
 .spatial_diff_map <- function(
@@ -390,7 +654,8 @@
   break_rounding = 5,
   base_size = 11,
   title = NULL,
-  fill_prefix = NULL
+  fill_prefix = NULL,
+  coord_multiplier = 1000
 ) {
   has_mpd <- "mean_pr_diff" %in% names(grid)
   agg <- grid |>
@@ -404,7 +669,9 @@
         NA_real_
       }
     ) |>
-    dplyr::mutate(X = 1000 * .data$X, Y = 1000 * .data$Y) |>
+    dplyr::mutate(
+      X = coord_multiplier * .data$X, Y = coord_multiplier * .data$Y
+    ) |>
     sf::st_as_sf(
       coords = c("X", "Y"),
       crs = suppressWarnings(crs),
@@ -427,7 +694,7 @@
 
   fill_scale <- if (transform_color_scale) {
     ggplot2::scale_fill_gradient2(
-      trans = .negsqrt_trans(),
+      transform = .negsqrt_trans(),
       breaks = breaks,
       labels = break_labels,
       midpoint = 0,
@@ -454,7 +721,7 @@
     }
   }
 
-  ggOceanMaps::basemap(agg, crs = crs, base_size = base_size) +
+  .basemap(agg, crs = crs, base_size = base_size) +
     ggplot2::geom_raster(
       data = agg,
       ggplot2::aes(x = .data$X, y = .data$Y, fill = .data[[spatial_response]])
@@ -474,4 +741,44 @@
       legend.box.background = ggplot2::element_blank(),
       plot.margin = ggplot2::margin(5.5, 10, 5.5, 5.5)
     )
+}
+
+#' Attach ggOceanMaps for the duration of the calling function
+#'
+#' ggOceanMaps looks up its built-in map data (e.g. `dd_land`) by name via the
+#' search path, so map calls fail with "object 'dd_land' not found" when the
+#' package is only loaded (`ggOceanMaps::`) and not attached (`library()`).
+#' Attaches it if needed and detaches again when the caller exits.
+#' @param env Frame whose exit triggers the detach.
+#' @keywords internal
+#' @noRd
+.attach_ggOceanMaps <- function(env = parent.frame()) {
+  if (!"package:ggOceanMaps" %in% search()) {
+    suppressMessages(attachNamespace("ggOceanMaps"))
+    do.call(on.exit, list(quote(detach("package:ggOceanMaps")), add = TRUE),
+      envir = env)
+  }
+  invisible()
+}
+
+#' A basemap that falls back to a plain map without ggOceanMaps
+#'
+#' Uses [ggOceanMaps::basemap()] when \pkg{ggOceanMaps} is installed.
+#' Otherwise returns a plain `ggplot2` map (no land polygons) with the extent
+#' and projection of `data`, so non-marine users can still draw the maps.
+#'
+#' @param data An `sf` object defining the map extent.
+#' @param crs Coordinate reference system of the map.
+#' @param base_size Base font size.
+#' @keywords internal
+#' @noRd
+.basemap <- function(data, crs, base_size = 11, ...) {
+  if (requireNamespace("ggOceanMaps", quietly = TRUE)) {
+    .attach_ggOceanMaps()
+    return(ggOceanMaps::basemap(data, crs = crs, base_size = base_size, ...))
+  }
+  ggplot2::ggplot() +
+    ggplot2::geom_sf(data = data, alpha = 0, inherit.aes = FALSE) +
+    ggplot2::coord_sf(crs = suppressWarnings(sf::st_crs(crs))) +
+    ggplot2::theme_bw(base_size = base_size)
 }

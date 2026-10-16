@@ -16,6 +16,7 @@ knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
 ```{r setup, message = FALSE}
 library(sdmTMBexperiments)
 library(sdmTMB)
+library(ggOceanMaps)
 ```
 
 ## Model comparison
@@ -44,7 +45,7 @@ cmp <- compare_models(m1, m2, newdata = nd, object_crs = 32609)
 
 # Index time series, annotated with Mohn's rho and modified using ggplot2 syntax
 plot(cmp, mohn = TRUE) +
-  scale_x_continuous(
+  ggplot2::scale_x_continuous(
     breaks = seq(min(pcod$year), max(pcod$year), by = 2),
     labels = substr(seq(min(pcod$year), max(pcod$year), by = 2), 3, 4)
   )
@@ -78,7 +79,7 @@ plot(
 
 ## Diagnostics and result maps
 
-All map helpers render on a [`ggOceanMaps::basemap()`](https://mikkovihtakari.github.io/ggOceanMaps/reference/basemap.html). Plotting the SPDE mesh and model results requires knowing the `utm_crs` used by the [`sdmTMB::add_utm_columns()`](https://sdmtmb.github.io/sdmTMB/reference/add_utm_columns.html) function. The X and Y coordinates are divided by 1000 in that function. The example dataset does not contain information about the UTM zone, but the information is extracted from sdmTMB examples. In real data, use the [`sdmTMB::get_crs()`](https://sdmtmb.github.io/sdmTMB/reference/add_utm_columns.html) function to get the correct UTM zone. 
+All map helpers render on a [`ggOceanMaps::basemap()`](https://mikkovihtakari.github.io/ggOceanMaps/reference/basemap.html) when ggOceanMaps is installed (otherwise on a plain map). Plotting the SPDE mesh and model results requires knowing the `utm_crs` used by the [`sdmTMB::add_utm_columns()`](https://sdmtmb.github.io/sdmTMB/reference/add_utm_columns.html) function. The X and Y coordinates are divided by 1000 in that function. The example dataset does not contain information about the UTM zone, but the information is extracted from sdmTMB examples. In real data, use the [`sdmTMB::get_crs()`](https://sdmtmb.github.io/sdmTMB/reference/add_utm_columns.html) function to get the correct UTM zone. 
 
 ```{r diagnostics}
 plot_mesh(mesh, crs = 32609, data = pcod, value = "density")
@@ -128,7 +129,7 @@ The `sdmTMB_mesh_cv()` performs a block cross-validation of a fitted model at mu
 
 ```{r mesh-cv, message = FALSE}
 # Requires the 'blockCV' package.
-cv <- sdmTMB_mesh_cv(m2, mesh_cutoffs = c(10, 20, 30), k = 3)
+cv <- sdmTMB_mesh_cv(m2, mesh_cutoffs = c(10, 20, 30), k = 3, object_crs = 32609)
 cv
 plot(cv)
 ```
@@ -144,7 +145,7 @@ plot(retr, index_divisor = 1e3, index_unit = "1000 t")
 
 ## Prediction grids
 
-The bundled `sebastes` dataset (beaked redfish survey stations) is used to demonstrate the prediction-grid helpers. `make_survey_prediction_region()` builds a concave hull around a survey's stations, and `make_prediction_grid()` lays a regular grid over it. The function can be used to extract depths and drop cells outside a specified depth range. The example below builds a prediction region and grid for the EggaN survey series, and extracts depths from the default bathymetry source (GEBCO 2022).
+The bundled `sebastes` dataset (beaked redfish survey stations) is used to demonstrate the prediction-grid helpers. `make_survey_prediction_region()` builds a concave hull around a survey's stations, and `make_prediction_grid()` lays a regular grid over it. The function can be used to extract depths and drop cells outside a specified depth range. The example below builds a prediction region and grid for the EggaN survey series, and extracts depths. By default depths come from `ggOceanMaps::get_depth()` (which downloads the ETOPO 2022 bathymetry on first use); here we pass `depth_fun = sebastes_depth`, a small bundled bathymetry of the study area, so the vignette needs no download. Use the default for real analyses.
 
 ```{r grids, message = FALSE}
 data(sebastes)
@@ -153,12 +154,16 @@ eggan <- subset(sebastes, cruiseseries == "EggaN")
 region <- make_survey_prediction_region(eggan, crs = 32633, concavity = 5)
 
 # the result is an sf object
-ggOceanMaps::qmap(region, fill = I(NA))
+qmap(region, fill = I(NA))
 
 # max_depth turns on depth extraction, via ggOceanMaps::get_depth() by
 # default (bathy_style controls the bathymetry source); cells outside
 # c(1, max_depth) are dropped. plot() then colours by depth automatically.
-grid <- make_prediction_grid(region, resolution = 20, max_depth = 1000)
+# Here `depth_fun = sebastes_depth` uses a small bundled demonstration
+# bathymetry to avoid the large download get_depth() needs on first use.
+grid <- make_prediction_grid(
+  region, resolution = 20, max_depth = 1000, depth_fun = sebastes_depth
+)
 range(grid$depth)
 plot(grid)
 ```
@@ -185,7 +190,9 @@ compiled_model <- sdmTMB(
 )
 
 region <- make_survey_prediction_region(sub, crs = 32633, concavity = 5)
-grid <- make_prediction_grid(region, resolution = 40, max_depth = 500)
+grid <- make_prediction_grid(
+  region, resolution = 40, max_depth = 500, depth_fun = sebastes_depth
+)
 
 plot(grid)
 

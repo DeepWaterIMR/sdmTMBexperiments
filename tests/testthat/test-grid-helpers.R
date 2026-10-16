@@ -24,16 +24,24 @@ test_that("make_prediction_grid errors on non-sf region", {
   expect_error(make_prediction_grid(data.frame(X = 1, Y = 1), resolution = 10))
 })
 
-test_that("make_prediction_grid extracts depth automatically via ggOceanMaps", {
-  skip_on_cran()
+test_that("make_prediction_grid extracts depth with a depth_fun", {
   skip_if_not_installed("concaveman")
   data(sebastes)
   d <- subset(sebastes, cruiseseries == "EggaN")
   region <- make_survey_prediction_region(d, crs = 32633)
-
-  grid <- make_prediction_grid(region, resolution = 20, max_depth = 1000)
-  expect_true("depth" %in% names(grid))
+  grid <- make_prediction_grid(
+    region, resolution = 20, max_depth = 1000, depth_fun = sebastes_depth
+  )
+  expect_true(nrow(grid) > 100)
   expect_true(all(grid$depth >= 1 & grid$depth <= 1000))
+  # reproduces the recorded station depths (coarse raster: expect a close, not
+  # exact, match)
+  pts <- sf::st_as_sf(d, coords = c("lon", "lat"), crs = 4326)
+  est <- sebastes_depth(pts)
+  ok <- !is.na(est)
+  expect_gt(mean(ok), 0.95)
+  expect_gt(cor(est[ok], d$depth[ok]), 0.8)
+  expect_true(all(is.na(sebastes_depth(sf::st_sfc(sf::st_point(c(-60, 10)), crs = 4326)))))
 
   # a custom depth_fun overrides the automatic ggOceanMaps::get_depth() lookup
   grid2 <- make_prediction_grid(
@@ -45,6 +53,7 @@ test_that("make_prediction_grid extracts depth automatically via ggOceanMaps", {
 
 test_that("plot.sdmTMB_prediction_grid works with and without a value column", {
   skip_if_not_installed("concaveman")
+  skip_if_no_map_data()
   data(sebastes)
   d <- subset(sebastes, cruiseseries == "EggaN")
   region <- make_survey_prediction_region(d, crs = 32633)

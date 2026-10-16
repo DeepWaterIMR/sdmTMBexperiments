@@ -10,7 +10,7 @@ sdmTMB_mesh_cv(
   k = 3,
   block_size = NULL,
   response = NULL,
-  xy_cols = c("X", "Y"),
+  xy_cols = NULL,
   coord_multiplier = 1000,
   object_crs = NULL,
   control = NULL,
@@ -20,8 +20,9 @@ sdmTMB_mesh_cv(
 )
 }
 \arguments{
-\item{object}{A fitted \code{\link[sdmTMB:sdmTMB]{sdmTMB::sdmTMB()}} model. Model settings (formula,
-family, spatial and spatiotemporal structure, time column) are inherited.}
+\item{object}{A fitted \code{\link[sdmTMB:sdmTMB]{sdmTMB::sdmTMB()}} model. All model settings
+(formula, family, spatial and spatiotemporal structure, time column,
+offset, weights, priors, etc.) are inherited.}
 
 \item{mesh_cutoffs}{Numeric vector of mesh cutoff values to compare.}
 
@@ -34,8 +35,8 @@ family, spatial and spatiotemporal structure, time column) are inherited.}
 presence/absence blocks for \code{\link[blockCV:cv_spatial]{blockCV::cv_spatial()}}. If \code{NULL} (default),
 taken from the model formula's left-hand side.}
 
-\item{xy_cols}{Character vector of the coordinate columns. Default
-\code{c("X", "Y")}.}
+\item{xy_cols}{Character vector of the coordinate columns. If \code{NULL}
+(default), taken from the model mesh (\code{object$spde$xy_cols}).}
 
 \item{coord_multiplier}{Numeric factor to convert \code{xy_cols} to CRS units.
 Default \code{1000}.}
@@ -46,7 +47,9 @@ model mesh.}
 \item{control}{An \code{\link[sdmTMB:sdmTMBcontrol]{sdmTMB::sdmTMBcontrol()}} object for the CV fits. If \code{NULL},
 inherited from \code{object}.}
 
-\item{n_workers}{Integer. Number of parallel workers. Default \code{1}.}
+\item{n_workers}{Integer. Number of parallel workers. Default \code{1}, which
+uses whatever \code{\link[future:plan]{future::plan()}} is currently set. Values \verb{> 1} set a
+temporary \code{future::multisession} plan.}
 
 \item{future_seed}{Logical or integer. Future-compatible random seed.}
 
@@ -56,7 +59,7 @@ inherited from \code{object}.}
 A data frame (tibble) of class \code{sdmTMB_mesh_cv} with one row per
 cutoff: \code{cutoff}, \code{crashed}, \code{converged}, \code{sanity}, \code{sum_loglik} (the
 summed hold-out log-likelihood from \code{\link[sdmTMB:sdmTMB_cv]{sdmTMB::sdmTMB_cv()}}; higher is
-better), \code{mean_aic}, and the derived \code{deltaNLL}, \code{deltaNLL_pr},
+better), \code{mean_aic} (a rough guide only; see Description), and the derived \code{deltaNLL}, \code{deltaNLL_pr},
 \code{deltaAIC}, \code{deltaAIC_pr}. \code{deltaNLL}/\code{deltaAIC} are relative to the
 best-fitting cutoff (\code{0} = best; lower is better, mirroring AIC). The
 list of \code{\link[sdmTMB:sdmTMB_cv]{sdmTMB::sdmTMB_cv()}} objects is attached as the \code{"cv"}
@@ -71,8 +74,14 @@ block cross-validation. Spatial folds are created with
 footing.
 
 This is a parameterised version of an exploratory workflow: all model
-settings are inherited from the fitted \code{object}, and nothing about the data
-is assumed beyond the coordinate and response columns.
+settings are inherited from the original call of the fitted \code{object} (as
+with \code{\link[sdmTMB:update.sdmTMB]{sdmTMB::update.sdmTMB()}}), and nothing about the data is assumed
+beyond the coordinate and response columns.
+
+The summed hold-out log-likelihood (\code{sum_loglik}) is the headline metric.
+AIC (\code{mean_aic}, \code{deltaAIC}) is reported as a rough guide only: AIC values
+of models fitted with different meshes are not strictly comparable, since
+each mesh is a different approximation of the random fields.
 }
 \examples{
 \donttest{
@@ -82,7 +91,7 @@ fit <- sdmTMB::sdmTMB(
   data = sdmTMB::pcod, formula = density ~ 0 + as.factor(year),
   time = "year", mesh = mesh, family = sdmTMB::tweedie(link = "log")
 )
-cv <- sdmTMB_mesh_cv(fit, mesh_cutoffs = c(15, 30), k = 3)
+cv <- sdmTMB_mesh_cv(fit, mesh_cutoffs = c(15, 30), k = 3, object_crs = 32609)
 cv
 plot(cv)
 }
