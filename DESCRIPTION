@@ -1,7 +1,7 @@
 Package: sdmTMBexperiments
 Title: Experimental Helper Functions for 'sdmTMB'
-Version: 0.1.5
-Date: 2026-10-16
+Version: 0.1.6
+Date: 2026-10-26
 Authors@R: 
     person("Mikko", "Vihtakari",  email = "mikko.vihtakari@hi.no", 
         role = c("aut", "cre"),
