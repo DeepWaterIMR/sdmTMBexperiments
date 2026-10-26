@@ -1,4 +1,4 @@
-# sdmTMBexperiments 0.1.4
+# sdmTMBexperiments 0.1.5
 
 2026-10-16 Merge the refit, `xy_cols` and dependency fixes with the model-selection functions.
 
@@ -97,6 +97,10 @@
 - `tests/` and `vignettes/` are no longer build-ignored, so `R CMD check` on
   CI now runs the tests and builds the vignette. New tests check that refits
   reproduce the original fit.
+
+# sdmTMBexperiments 0.1.4
+
+2026-10-25 Restrict pkgdown write permission to the deployment job; pull requests build the site without deploying.
 
 # sdmTMBexperiments 0.1.3
 

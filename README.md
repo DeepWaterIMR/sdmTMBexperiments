@@ -100,7 +100,7 @@ citation("sdmTMBexperiments")
 #> To cite package 'sdmTMBexperiments' in publications use:
 #> 
 #>   Vihtakari M (2026). _sdmTMBexperiments: Experimental Helper Functions
-#>   for 'sdmTMB'_. R package version 0.1.3,
+#>   for 'sdmTMB'_. R package version 0.1.4,
 #>   <https://github.com/DeepWaterIMR/sdmTMBexperiments>.
 #> 
 #> A BibTeX entry for LaTeX users is
@@ -109,7 +109,7 @@ citation("sdmTMBexperiments")
 #>     title = {sdmTMBexperiments: Experimental Helper Functions for 'sdmTMB'},
 #>     author = {Mikko Vihtakari},
 #>     year = {2026},
-#>     note = {R package version 0.1.3},
+#>     note = {R package version 0.1.4},
 #>     url = {https://github.com/DeepWaterIMR/sdmTMBexperiments},
 #>   }
 ```
