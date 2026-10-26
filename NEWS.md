@@ -1,3 +1,7 @@
+# sdmTMBexperiments 0.1.7
+
+* Pin the older-R Linux check to Ubuntu 24.04 to avoid the rolling ubuntu-latest image’s system-package download delays.
+
 # sdmTMBexperiments 0.1.6
 
 * Publish pkgdown directly through GitHub Pages artifacts, with source-version verification and no generated commits.

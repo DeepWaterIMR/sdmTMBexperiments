@@ -101,7 +101,7 @@ utils::citation("sdmTMBexperiments", auto = as.list(read.dcf("DESCRIPTION")[1, ]
 #> To cite package 'sdmTMBexperiments' in publications use:
 #> 
 #>   Vihtakari M (2026). _sdmTMBexperiments: Experimental Helper Functions
-#>   for 'sdmTMB'_. R package version 0.1.6,
+#>   for 'sdmTMB'_. R package version 0.1.7,
 #>   <https://github.com/DeepWaterIMR/sdmTMBexperiments>.
 #> 
 #> A BibTeX entry for LaTeX users is
@@ -110,7 +110,7 @@ utils::citation("sdmTMBexperiments", auto = as.list(read.dcf("DESCRIPTION")[1, ]
 #>     title = {sdmTMBexperiments: Experimental Helper Functions for 'sdmTMB'},
 #>     author = {Mikko Vihtakari},
 #>     year = {2026},
-#>     note = {R package version 0.1.6},
+#>     note = {R package version 0.1.7},
 #>     url = {https://github.com/DeepWaterIMR/sdmTMBexperiments},
 #>   }
 ```
