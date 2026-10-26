@@ -1,6 +1,6 @@
 # Project overview
 
-**sdmTMBexperiments** is a public R package (v0.1.4, GPL-3) of experimental
+**sdmTMBexperiments** is a public R package (v0.1.7, GPL-3) of experimental
 helper functions for fitted [sdmTMB](https://github.com/sdmTMB/sdmTMB) models.
 
 ## Purpose

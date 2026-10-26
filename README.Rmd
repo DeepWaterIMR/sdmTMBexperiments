@@ -5,6 +5,7 @@ output: github_document
 <!-- README.md is generated from README.Rmd. Please edit that file -->
 
 ```{r, include = FALSE}
+pkgload::load_all(".", quiet = TRUE)
 knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>",
@@ -69,5 +70,5 @@ This is only a taste of what's available — see the [Get started vignette](http
 The functions can be freely reused in sdmTMB development. If you use these functions, please cite the function developer (Mikko Vihtakari, Institute of Marine Research). If you use the package in publications, please cite it:
 
 ```{r}
-citation("sdmTMBexperiments")
+utils::citation("sdmTMBexperiments", auto = as.list(read.dcf("DESCRIPTION")[1, ]))
 ```

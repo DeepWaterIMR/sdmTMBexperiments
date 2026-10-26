@@ -16,14 +16,15 @@ models: model comparison, mesh-resolution sensitivity, retrospective
 analysis, survey-specific index comparison, prediction-grid
 construction, and diagnostic plotting. It doubles as a showcase of how
 to use these functions and a staging ground for methods that may later
-be adopted into `sdmTMB`.
+be adopted into sdmTMB.
 
 The functions may be freely reused. Figures are made using
 [ggplot2](https://ggplot2.tidyverse.org/reference/), and can be modified
 using ggplot syntax. Maps are drawn on
 [ggOceanMaps](https://mikkovihtakari.github.io/ggOceanMaps/) basemaps
-when that package is installed. The functions in this package are experimental and likely contain bugs.
-If you spot one, please file an issue or commit a PR.
+when that package is installed. The functions in this package are
+experimental and likely contain bugs. If you spot one, please file an
+issue or commit a PR.
 
 📖 **[Documentation and full
 walkthrough](https://deepwaterimr.github.io/sdmTMBexperiments/)** —
@@ -96,11 +97,11 @@ Institute of Marine Research). If you use the package in publications,
 please cite it:
 
 ``` r
-citation("sdmTMBexperiments")
+utils::citation("sdmTMBexperiments", auto = as.list(read.dcf("DESCRIPTION")[1, ]))
 #> To cite package 'sdmTMBexperiments' in publications use:
 #> 
 #>   Vihtakari M (2026). _sdmTMBexperiments: Experimental Helper Functions
-#>   for 'sdmTMB'_. R package version 0.1.4,
+#>   for 'sdmTMB'_. R package version 0.1.7,
 #>   <https://github.com/DeepWaterIMR/sdmTMBexperiments>.
 #> 
 #> A BibTeX entry for LaTeX users is
@@ -109,7 +110,7 @@ citation("sdmTMBexperiments")
 #>     title = {sdmTMBexperiments: Experimental Helper Functions for 'sdmTMB'},
 #>     author = {Mikko Vihtakari},
 #>     year = {2026},
-#>     note = {R package version 0.1.4},
+#>     note = {R package version 0.1.7},
 #>     url = {https://github.com/DeepWaterIMR/sdmTMBexperiments},
 #>   }
 ```

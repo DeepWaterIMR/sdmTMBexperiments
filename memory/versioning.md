@@ -22,3 +22,5 @@ fixed install from an unfixed one.
 ordinary commits. Keep the matching `NEWS.md` heading and README citation in the same
 commit. Enable the repository hook with `git config core.hooksPath .githooks`; never bypass
 it to avoid versioning.
+
+The website is built into a Pages artifact and deployed directly by GitHub Actions. Its homepage version and citation are checked against DESCRIPTION before upload; generated site files are not committed.
