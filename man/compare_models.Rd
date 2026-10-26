@@ -9,6 +9,7 @@ compare_models(
   newdata,
   reference_model = 1,
   object_crs = NULL,
+  coord_multiplier = 1000,
   bias_correct = FALSE,
   level = 0.95,
   area = 1,
@@ -32,6 +33,10 @@ comparison. Default \code{1}.}
 \item{object_crs}{Coordinate reference system for the model data. If \code{NULL}
 (default), extracted from the first model's mesh when available.}
 
+\item{coord_multiplier}{Numeric factor to convert the model coordinates to
+CRS units for the spatial maps. Default \code{1000} (coordinates in km, CRS in
+m); use \code{1} for coordinates already in CRS units.}
+
 \item{bias_correct}{Logical. Apply bias correction via \code{\link[TMB:sdreport]{TMB::sdreport()}}?
 Default \code{FALSE}.}
 
@@ -42,7 +47,9 @@ Default \code{FALSE}.}
 
 \item{silent}{Logical. Suppress model output? Default \code{TRUE}.}
 
-\item{n_workers}{Integer. Number of parallel workers. Default \code{1}.}
+\item{n_workers}{Integer. Number of parallel workers. Default \code{1}, which
+uses whatever \code{\link[future:plan]{future::plan()}} is currently set. Values \verb{> 1} set a
+temporary \code{future::multisession} plan.}
 
 \item{nsplit}{Integer. Number of splits for \code{\link[sdmTMB:get_index_split]{sdmTMB::get_index_split()}}.}
 
@@ -52,8 +59,9 @@ parallel processing. See \code{\link[future.apply:future_lapply]{future.apply::f
 \value{
 An object of class \code{sdmTMB_model_comparison}, a list with elements
 \code{sanity}, \code{nll}, \code{index} and \code{grid} (a list of per-cell prediction-
-difference data frames). Carries \code{crs}, \code{reference_model} and \code{model_names}
-attributes.
+difference data frames). The time column of \code{index} is always named
+\code{year}. Carries \code{crs}, \code{coord_multiplier}, \code{reference_model} and
+\code{model_names} attributes.
 }
 \description{
 Compares a set of fitted sdmTMB models by calculating survey indices,

@@ -52,6 +52,7 @@ bubble_map <- function(
   if (!requireNamespace("ggspatial", quietly = TRUE)) {
     stop("Package 'ggspatial' is required for bubble_map().")
   }
+  rlang::check_installed("ggOceanMaps", reason = "for bubble_map().")
   if (!response %in% names(x)) {
     stop("Response column '", response, "' not found in `x`.")
   }
@@ -67,10 +68,9 @@ bubble_map <- function(
   max_val <- ceiling(max(x$value, na.rm = TRUE))
   color_breaks <- sort(unique(c(
     0,
-    unname(plyr::round_any(
+    unname(floor(
       stats::quantile(x$value[x$value != 0], c(seq(0, 1, 0.25), 0.99, 0.995),
-                      na.rm = TRUE),
-      1, floor
+                      na.rm = TRUE)
     )),
     max_val
   )))
@@ -81,14 +81,14 @@ bubble_map <- function(
   pos_scale <- if (filled_circles) {
     ggplot2::binned_scale(
       aesthetics = "fill",
-      palette = function(z) viridis::turbo(length(color_breaks) - 1),
+      palette = function(z) scales::viridis_pal(option = "turbo")(length(color_breaks) - 1),
       limits = c(0, max_val + 1), breaks = color_breaks, show.limits = TRUE,
       guide = "bins"
     )
   } else {
     ggplot2::binned_scale(
       aesthetics = "colour",
-      palette = function(z) viridis::turbo(length(color_breaks) - 1),
+      palette = function(z) scales::viridis_pal(option = "turbo")(length(color_breaks) - 1),
       limits = c(0, max_val + 1), breaks = color_breaks, show.limits = TRUE,
       guide = "bins"
     )
@@ -117,6 +117,7 @@ bubble_map <- function(
     )
   }
 
+  .attach_ggOceanMaps()
   p <- ggOceanMaps::basemap(x, base_size = base_size, expand.factor = 1.05) +
     ggspatial::geom_spatial_point(
       data = x[x$value == 0, ],

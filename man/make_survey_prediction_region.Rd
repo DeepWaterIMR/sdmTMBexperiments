@@ -46,7 +46,10 @@ the full model domain.
 data(sebastes)
 eggan <- subset(sebastes, cruiseseries == "EggaN")
 region <- make_survey_prediction_region(eggan, crs = 32633, concavity = 5)
-ggOceanMaps::qmap(region, fill = I(NA))
+if (requireNamespace("ggOceanMaps", quietly = TRUE)) {
+  library(ggOceanMaps) # qmap() needs ggOceanMaps attached
+  qmap(region, fill = I(NA))
+}
 }
 }
 \seealso{

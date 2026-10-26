@@ -35,8 +35,10 @@ jobs:
       # --as-cran otherwise forces \donttest{} to run. Explicitly setting this
       # env var overrides that default (R only falls back to --as-cran's value
       # when the var is unset), skipping \donttest{} here without needing
-      # \dontrun{}. See memory/examples-policy.md.
+      # \dontrun{}.
       _R_CHECK_DONTTEST_EXAMPLES_: false
+      # Run the model-fitting tests (skip_on_cran()) on CI.
+      NOT_CRAN: true
 
     steps:
       - uses: actions/checkout@v4

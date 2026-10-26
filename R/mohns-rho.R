@@ -7,7 +7,11 @@
 #'
 #' This is the shared engine used by the plotting methods of
 #' [sdmTMB_retro()], [compare_models()] and [compare_meshes()], exposed so it
-#' can be used directly on any long-format table of index series.
+#' can be used directly on any long-format table of index series. It is a
+#' retrospective Mohn's rho only when the series end in different years (as
+#' retrospective peels do). When all series share the same final year (as in
+#' [compare_models()] and [compare_meshes()]), it is the mean relative
+#' difference in that year.
 #'
 #' @param data A long-format data frame containing at least the grouping
 #'   column, a year column, and an estimate column.

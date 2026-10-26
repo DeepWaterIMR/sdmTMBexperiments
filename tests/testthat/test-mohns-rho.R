@@ -28,3 +28,24 @@ test_that("mohns_rho returns NA when there are no non-reference series", {
   idx <- data.frame(model = "ref", year = 2020, est = 10)
   expect_true(is.na(mohns_rho(idx, "model", "ref")))
 })
+
+test_that("mohns_rho handles identical peels, zero references and all-NA peels", {
+  idx <- data.frame(
+    peel = rep(c("peel 0", "peel 1", "peel 2", "peel 3"), each = 3),
+    year = rep(2018:2020, 4),
+    est = c(
+      10, 0, 14,     # reference, zero in 2019
+      10, 12, NA,    # peel 1 terminal year 2019: reference is 0 -> NA, dropped
+      11, NA, NA,    # peel 2 terminal year 2018: (11 - 10)/10
+      NA, NA, NA     # peel 3: all NA, dropped
+    )
+  )
+  expect_equal(mohns_rho(idx, "peel", "peel 0"), (11 - 10) / 10)
+
+  same <- data.frame(
+    peel = rep(c("peel 0", "peel 1"), each = 3),
+    year = rep(2018:2020, 2),
+    est = c(10, 12, 14, 10, 12, NA)
+  )
+  expect_equal(mohns_rho(same, "peel", "peel 0"), 0)
+})

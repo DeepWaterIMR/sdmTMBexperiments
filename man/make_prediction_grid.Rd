@@ -66,7 +66,11 @@ region <- make_survey_prediction_region(eggan, crs = 32633, concavity = 5)
 # max_depth turns on depth extraction, via ggOceanMaps::get_depth() by
 # default (bathy_style controls the bathymetry source); cells outside
 # c(1, max_depth) are dropped. plot() then colours by depth automatically.
-grid <- make_prediction_grid(region, resolution = 20, max_depth = 1000)
+# Here we pass the small bundled demonstration bathymetry as `depth_fun`
+# to avoid the large bathymetry download get_depth() needs on first use.
+grid <- make_prediction_grid(
+  region, resolution = 20, max_depth = 1000, depth_fun = sebastes_depth
+)
 range(grid$depth)
 plot(grid)
 }

@@ -90,11 +90,13 @@ plot_mesh <- function(
     coords = c("X", "Y"), crs = suppressWarnings(sf::st_crs(crs))
   )
 
-  basemap_args <- list(nodes_sf, crs = mesh_crs, base_size = base_size)
+  basemap_args <- list()
   if (!is.null(land_col)) basemap_args$land.col <- land_col
   if (!is.null(lon_interval)) basemap_args$lon.interval <- lon_interval
   if (!is.null(lat_interval)) basemap_args$lat.interval <- lat_interval
-  p <- do.call(ggOceanMaps::basemap, basemap_args)
+  p <- do.call(.basemap, c(
+    list(nodes_sf, crs = mesh_crs, base_size = base_size), basemap_args
+  ))
 
   if (!is.null(data)) {
     if (!is.null(value) && !is.null(zero_col)) {
@@ -252,7 +254,7 @@ plot_prediction_map <- function(
     remove = FALSE
   )
 
-  p <- ggOceanMaps::basemap(d_sf, crs = crs, base_size = base_size) +
+  p <- .basemap(d_sf, crs = crs, base_size = base_size) +
     ggplot2::geom_raster(
       data = d_sf,
       ggplot2::aes(x = .data$.X, y = .data$.Y, fill = .data$value)
@@ -347,7 +349,7 @@ plot_random_field <- function(
     remove = FALSE
   )
 
-  p <- ggOceanMaps::basemap(d_sf, crs = crs, base_size = base_size) +
+  p <- .basemap(d_sf, crs = crs, base_size = base_size) +
     ggplot2::geom_raster(
       data = d_sf,
       ggplot2::aes(x = .data$.X, y = .data$.Y, fill = .data$value)
@@ -508,10 +510,25 @@ plot_fixed_effects <- function(fit, base_size = 11) {
 #' Variance partitioning of an sdmTMB model
 #'
 #' @description
-#' Partitions the link-scale variance of a fitted sdmTMB model among its random
-#' components (spatial field `sigma_O`, spatiotemporal field `sigma_E`, smooth
-#' terms, and observation error `phi`) using [sdmTMB::tidy()], and plots the
-#' proportion of variance explained by each.
+#' Partitions the link-scale variance of a fitted sdmTMB model among its
+#' random components using [sdmTMB::tidy()], and plots the proportion of that
+#' variance from each. This is an approximate, descriptive summary, not a
+#' formal variance decomposition.
+#'
+#' @details
+#' Only components whose standard deviation is a marginal SD on the link scale
+#' are included:
+#' * the spatial field (`sigma_O`) and spatiotemporal field (`sigma_E`);
+#' * random intercepts (`sd__(Intercept)`, one per grouping factor);
+#' * observation error, only for a `gaussian()` family with an identity link
+#'   or a `lognormal()` family, where `phi` is an SD on the link scale.
+#'
+#' Left out are observation error for other families (for e.g. Tweedie, Gamma
+#' or NB2, `phi` is a dispersion or shape parameter, and binomial has none),
+#' smooth-term SDs (`sd__s(...)`, the SD of penalised spline coefficients,
+#' not of the fitted smooth) and spatially varying coefficient SDs
+#' (`sigma_Z`, whose contribution scales with the covariate). The proportions
+#' are therefore of the variance of the included components only.
 #'
 #' @param fit A fitted [sdmTMB::sdmTMB()] model.
 #' @param base_size Numeric. Base font size. Default `11`.
@@ -538,20 +555,29 @@ plot_variance_partitioning <- function(fit, base_size = 11) {
   n_models <- length(fit$family$family)
   tab <- dplyr::bind_rows(lapply(seq_len(n_models), function(m) {
     rp <- sdmTMB::tidy(fit, effects = "ran_pars", model = m)
-    rp <- rp[rp$term %in% c("sigma_O", "sigma_E", "phi") |
-               grepl("sd__s", rp$term), , drop = FALSE]
+    fam <- fit$family$family[m]
+    link <- fit$family$link[m]
+    phi_on_link <- (fam == "gaussian" && link == "identity") ||
+      fam == "lognormal"
+    keep <- rp$term %in% c("sigma_O", "sigma_E", "sd__(Intercept)") |
+      (rp$term == "phi" & phi_on_link)
+    rp <- rp[keep & !is.na(rp$estimate), , drop = FALSE]
     if (nrow(rp) == 0) return(NULL)
     rp$variance <- rp$estimate^2
-    rp$family <- fit$family$family[m]
+    rp$family <- fam
+    # only present when the model has random intercepts
+    grp <- if ("group_name" %in% names(rp)) rp$group_name else NA_character_
     rp$component <- ifelse(
       rp$term == "sigma_O", "Spatial (sigma_O)",
       ifelse(rp$term == "sigma_E", "Spatiotemporal (sigma_E)",
-             ifelse(rp$term == "phi", "Residual noise", "Smooth")))
+             ifelse(rp$term == "phi", "Observation error (phi)",
+                    paste0("Random intercept (", grp, ")"))))
     rp$proportion <- rp$variance / sum(rp$variance)
     rp
   }))
   if (is.null(tab) || nrow(tab) == 0) {
-    stop("No random-effect variances found to partition.")
+    stop("No link-scale random-effect variances found to partition. ",
+         "See Details in ?plot_variance_partitioning.")
   }
 
   p <- ggplot2::ggplot(
@@ -560,7 +586,7 @@ plot_variance_partitioning <- function(fit, base_size = 11) {
     ggplot2::geom_col(fill = "grey70", color = "black", linewidth = 0.3) +
     ggplot2::scale_y_continuous(labels = scales::percent_format()) +
     ggplot2::labs(x = "Model component",
-                  y = "Proportion of link-scale variance") +
+                  y = "Approx. proportion of link-scale variance") +
     ggplot2::theme_bw(base_size = base_size) +
     ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 20, hjust = 1))
 
@@ -574,6 +600,10 @@ plot_variance_partitioning <- function(fit, base_size = 11) {
 #' Compares the distribution of the observed response with the distribution of
 #' predicted values over the prediction grid, on a `log1p` x-axis, with the means
 #' marked. Blue lines indicate mean values.
+#'
+#' If the model has an offset, the observed response is divided by
+#' `exp(offset)` (e.g. catch per unit swept area), so it is on the same scale
+#' as predictions made without an offset (as for a prediction grid).
 #'
 #' @param fit A fitted [sdmTMB::sdmTMB()] model (for the observed response).
 #' @param pred A prediction data frame from `predict(fit, newdata = ...)`.
@@ -602,18 +632,19 @@ plot_variance_partitioning <- function(fit, base_size = 11) {
 plot_prediction_histogram <- function(fit, pred, response = NULL,
                                        column = "est", base_size = 11) {
   if (!inherits(fit, "sdmTMB")) stop("`fit` must be a fitted sdmTMB model.")
-  f <- if (length(fit$formula) > 1) fit$formula[[1]] else fit$formula[[1]]
-  if (is.null(response)) response <- all.vars(f)[1]
+  if (is.null(response)) response <- all.vars(fit$formula[[1]])[1]
   if (!response %in% names(fit$data)) {
     stop("Response column '", response, "' not found in the model data.")
   }
 
   obs <- data.frame(value = fit$data[[response]])
+  has_offset <- !is.null(fit$offset) && any(fit$offset != 0)
+  if (has_offset) obs$value <- obs$value / exp(fit$offset)
   prd <- data.frame(value = pred[[column]])
 
   common <- list(
     ggplot2::scale_x_continuous(
-      trans = "log1p",
+      transform = "log1p",
       breaks = c(1, 10, 100, 1e3, 1e4, 1e5, 1e6),
       expand = ggplot2::expansion(mult = 0.01)
     ),
@@ -623,9 +654,16 @@ plot_prediction_histogram <- function(fit, pred, response = NULL,
   p_obs <- ggplot2::ggplot(obs, ggplot2::aes(x = .data$value)) +
     ggplot2::geom_histogram(bins = 30) +
     ggplot2::geom_vline(xintercept = mean(obs$value, na.rm = TRUE), color = "blue") +
-    ggplot2::scale_y_continuous(trans = "log1p", expand = c(0.01, 0)) +
+    ggplot2::scale_y_continuous(transform = "log1p", expand = c(0.01, 0)) +
     common +
-    ggplot2::labs(x = "log(observed response + 1)", y = "Count")
+    ggplot2::labs(
+      x = if (has_offset) {
+        "log(observed response / exp(offset) + 1)"
+      } else {
+        "log(observed response + 1)"
+      },
+      y = "Count"
+    )
 
   p_prd <- ggplot2::ggplot(prd, ggplot2::aes(x = .data$value)) +
     ggplot2::geom_histogram(bins = 30) +
