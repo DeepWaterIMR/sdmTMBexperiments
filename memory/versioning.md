@@ -18,5 +18,7 @@ knitted citation) and [[project_overview]].
 leaves the version unchanged makes `packageVersion()` useless for telling a
 fixed install from an unfixed one.
 
-**How to apply:** include the bump in the same commit as the change, not as a
-separate follow-up commit.
+**How to apply:** the shared `.githooks/pre-commit` updates `Version` and `Date` on
+ordinary commits. Keep the matching `NEWS.md` heading and README citation in the same
+commit. Enable the repository hook with `git config core.hooksPath .githooks`; never bypass
+it to avoid versioning.

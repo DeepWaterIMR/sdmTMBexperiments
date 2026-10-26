@@ -1,3 +1,7 @@
+# sdmTMBexperiments 0.1.4
+
+2026-10-25 Restrict pkgdown write permission to the deployment job; pull requests build the site without deploying.
+
 # sdmTMBexperiments 0.1.3
 
 2026-10-14 Regenerate `plot_mesh.Rd` so its usage lists the new `plot_mesh()` arguments (fixes the R CMD check codoc WARNING).
