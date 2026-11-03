@@ -109,12 +109,14 @@ make_survey_prediction_region <- function(
 #'   `region`.
 #' @param coord_multiplier Numeric factor to convert model units to CRS units.
 #'   Default `1000`.
-#' @param max_depth Optional numeric. If supplied, grid cells with depth
-#'   outside `c(1, max_depth)` are dropped. Turns on depth extraction (see
+#' @param min_depth,max_depth Optional numeric depth limits. If either is
+#'   supplied, grid cells with depth outside `c(min_depth, max_depth)` are
+#'   dropped (`min_depth` defaults to `1`, which removes land, and `max_depth`
+#'   to `Inf`). Supplying either turns on depth extraction (see
 #'   `depth_fun`/`bathy_style`).
 #' @param depth_fun Optional function taking an `sf` points object and
 #'   returning a numeric vector of (positive) depths. Only used when
-#'   `max_depth` is set. If `NULL` (default) while `max_depth` is set, depth is
+#'   `min_depth` or `max_depth` is set. If `NULL` (default), depth is
 #'   extracted automatically via [ggOceanMaps::get_depth()] using `bathy_style`
 #'   — supply your own `depth_fun` to use a different bathymetry source (e.g. a
 #'   specific GEBCO file via `bathy.style = "raster_user"` and
@@ -147,6 +149,13 @@ make_survey_prediction_region <- function(
 #' )
 #' range(grid$depth)
 #' plot(grid)
+#'
+#' # A depth band, e.g. the depth range a slope survey targets
+#' band <- make_prediction_grid(
+#'   region, resolution = 20, min_depth = 400, max_depth = 1350,
+#'   depth_fun = sebastes_depth
+#' )
+#' range(band$depth)
 #' }
 #' @export
 make_prediction_grid <- function(
@@ -154,6 +163,7 @@ make_prediction_grid <- function(
   resolution,
   crs = NULL,
   coord_multiplier = 1000,
+  min_depth = NULL,
   max_depth = NULL,
   depth_fun = NULL,
   bathy_style = "raster_continuous"
@@ -173,7 +183,10 @@ make_prediction_grid <- function(
     Y = coords[, 2] / coord_multiplier
   )
 
-  if (!is.null(max_depth)) {
+  if (!is.null(min_depth) || !is.null(max_depth)) {
+    if (is.null(min_depth)) min_depth <- 1
+    if (is.null(max_depth)) max_depth <- Inf
+    if (min_depth >= max_depth) stop("`min_depth` must be smaller than `max_depth`.")
     if (is.null(depth_fun)) {
       rlang::check_installed("ggOceanMaps", reason = "to extract depths.")
       depth_fun <- function(pts) {
@@ -190,8 +203,8 @@ make_prediction_grid <- function(
       coords = c("X", "Y"), crs = suppressWarnings(sf::st_crs(crs))
     ))
     out$depth <- depth
-    out <- out[!is.na(out$depth) & out$depth >= 1 & out$depth <= max_depth, ,
-               drop = FALSE]
+    out <- out[!is.na(out$depth) & out$depth >= min_depth &
+                 out$depth <= max_depth, , drop = FALSE]
   }
 
   class(out) <- c("sdmTMB_prediction_grid", class(out))

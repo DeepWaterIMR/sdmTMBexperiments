@@ -1,3 +1,14 @@
+# sdmTMBexperiments 0.1.8
+
+2026-11-03 Survey-specific settings, the same-area comparison and leave-one-out refits for survey comparisons.
+
+## New features
+
+* `survey_spec()` defines a survey for `compare_surveys()`: one or several series combined, and its own formula, family, random fields, `extra_time`, mesh cutoff, data filter, depth band, hull settings, prediction grid and prediction values (e.g. `list(cruiseseries = "A")` for a model with the series as a fixed effect).
+* `compare_surveys()` accepts a named list of series vectors or `survey_spec()` objects and limits survey grids to a depth band (`depth_range`, or `"data"` for haul-depth quantiles). With a `compiled_model` it also computes a same-area comparison: the survey and compiled models predicted over the same cells (`domain = "shared"` in `$index`, `plot(type = "same_area")`). It returns a `$settings` table and reports survey indices only for years with data.
+* New `sdmTMB_leave_out()` (+ `plot()`) refits a model without each survey series, cruise or haul and reports the change in the index. Refits keep every setting of the original call; years without data after a removal are kept as `extra_time` and reported as `NA`.
+* `make_prediction_grid()` gains `min_depth`.
+
 # sdmTMBexperiments 0.1.7
 
 * Pin the older-R Linux check to Ubuntu 24.04 to avoid the rolling ubuntu-latest image’s system-package download delays.

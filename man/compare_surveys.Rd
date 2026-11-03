@@ -29,6 +29,13 @@ compare_surveys(
   n_workers = 1,
   future_seed = TRUE,
   concavity = 5,
+  buffer = 1,
+  depth_range = NULL,
+  depth_quantiles = c(0.02, 0.98),
+  depth_col = "depth",
+  same_area = !is.null(compiled_model),
+  compiled_region = NULL,
+  keep_models = FALSE,
   reference_label = "Compiled",
   verbose = TRUE
 )
@@ -48,21 +55,31 @@ index, or \code{NULL} (default). When provided, all settings of its original
 call (as with \code{\link[sdmTMB:update.sdmTMB]{sdmTMB::update.sdmTMB()}}; e.g. family, random fields, time
 column, \code{spatial_varying}, \code{priors}, ...), its coordinate columns and CRS
 are inherited, except those overridden by \code{formula}, \code{family}, \code{spatial},
-\code{spatiotemporal}, \code{control} and \code{offset_col}. Its \code{data} and \code{mesh} are
-replaced by each survey's data and a new mesh. A numeric \code{offset} or
-\code{weights} vector in the original call cannot be carried over to the
-survey subsets and gives an error (use \code{offset_col} or column-name
-arguments instead). Spatial prediction differences are computed. When
-\code{NULL}, spatial differences are skipped, \code{formula}, \code{family} and
-\code{object_crs} must be supplied, and the survey models use only \code{formula},
-\code{family}, \code{spatial}, \code{spatiotemporal}, \code{control}, \code{offset_col}, a \code{"year"}
-time column and the \code{xy_cols} coordinates.}
+\code{spatiotemporal}, \code{control} and \code{offset_col}, or by a \code{\link[=survey_spec]{survey_spec()}}.
+Its \code{data} and \code{mesh} are replaced by each survey's data and a new mesh.
+A numeric \code{offset} or \code{weights} vector in the original call cannot be
+carried over to the survey subsets and gives an error (use \code{offset_col}
+or column-name arguments instead). The same-area comparison and spatial
+prediction differences are computed. When \code{NULL}, these are skipped,
+\code{formula}, \code{family} and \code{object_crs} must be supplied, and the survey
+models use only \code{formula}, \code{family}, \code{spatial}, \code{spatiotemporal},
+\code{control}, \code{offset_col}, a \code{"year"} time column and the \code{xy_cols}
+coordinates (plus any \code{\link[=survey_spec]{survey_spec()}} settings).}
 
-\item{surveys}{Character vector of survey series names to compare. If \code{NULL}
-(default), all unique values of \code{data[[survey_col]]} are used.}
+\item{surveys}{Surveys to compare. One of:
+\itemize{
+\item \code{NULL} (default): every unique value of \code{data[[survey_col]]};
+\item a character vector of series names (names, if given, are used as
+labels);
+\item a named list whose elements are character vectors of series combined
+into one survey index, or \code{\link[=survey_spec]{survey_spec()}} objects with
+survey-specific settings, e.g.
+\code{list(EcoS = "EcoS", "Egga N+S" = survey_spec(c("EggaN", "EggaS"), spatiotemporal = "ar1"))}.
+}}
 
-\item{newdata}{A data frame (the global prediction grid) used to build
-survey-specific grids by spatial filtering.}
+\item{newdata}{A data frame (the compiled prediction grid, with a time
+column) from which survey grids are clipped. Also defines the compiled
+domain for the same-area comparison.}
 
 \item{object_crs}{Coordinate reference system. If \code{NULL}, taken from
 \code{compiled_model}.}
@@ -77,8 +94,8 @@ survey-specific grids by spatial filtering.}
 \item{control}{An \code{\link[sdmTMB:sdmTMBcontrol]{sdmTMB::sdmTMBcontrol()}} object. If \code{NULL}, inherited from
 \code{compiled_model} (falling back to \code{sdmTMBcontrol(newton_loops = 2)}).}
 
-\item{mesh_cutoff}{Numeric. Mesh cutoff (km) for the survey models. Default
-\code{30}.}
+\item{mesh_cutoff}{Numeric. Default mesh cutoff (in \code{xy_cols} units,
+typically km) for the survey models. Default \code{30}.}
 
 \item{offset_col}{Character. Column in \code{data} to use as a log-offset (e.g.
 \code{"swept_area"}). \code{NULL} (default) means no offset.}
@@ -109,14 +126,39 @@ name in \code{newdata}, or a numeric vector with one value per row of
 \item{nsplit}{Integer. Number of splits for \code{\link[sdmTMB:get_index_split]{sdmTMB::get_index_split()}}.
 Default \code{3}.}
 
-\item{n_workers}{Integer. Number of parallel workers. Default \code{1}, which
-uses whatever \code{\link[future:plan]{future::plan()}} is currently set. Values \verb{> 1} set a
-temporary \code{future::multisession} plan.}
+\item{n_workers}{Integer. Number of parallel workers (surveys are processed
+in parallel). Default \code{1}, which uses whatever \code{\link[future:plan]{future::plan()}} is
+currently set. Values \verb{> 1} set a temporary \code{future::multisession} plan.}
 
 \item{future_seed}{Logical or integer. Future-compatible random seed.}
 
-\item{concavity}{Numeric. Concavity for the survey footprint hulls (see
-\code{\link[=make_survey_prediction_region]{make_survey_prediction_region()}}). Default \code{5}.}
+\item{concavity}{Numeric. Default concavity for the survey footprint hulls
+(see \code{\link[=make_survey_prediction_region]{make_survey_prediction_region()}}). Default \code{5}.}
+
+\item{buffer}{Numeric. Default buffer around the survey footprint hulls, in
+CRS units (typically m). Default \code{1}.}
+
+\item{depth_range}{Default depth band for the survey grids: \code{NULL} (no
+depth limit, the default), a numeric vector \code{c(min, max)}, or \code{"data"}
+for quantiles of each survey's haul depths.}
+
+\item{depth_quantiles}{Numeric vector of two probabilities used when
+\code{depth_range = "data"}. Default \code{c(0.02, 0.98)}.}
+
+\item{depth_col}{Character. Depth column in \code{data} and the prediction
+grids. Default \code{"depth"}.}
+
+\item{same_area}{Logical. Compute the same-area comparison? Default \code{TRUE}
+when \code{compiled_model} is given.}
+
+\item{compiled_region}{Optional \code{sf} polygon of the compiled prediction
+domain, used to limit custom survey grids (\code{\link[=survey_spec]{survey_spec()}} \code{newdata}) to
+the compiled domain for the same-area comparison. If \code{NULL} (default), a
+concave hull of the unique \code{newdata} coordinates is used. Grids clipped
+from \code{newdata} are inside the domain by construction.}
+
+\item{keep_models}{Logical. Return the fitted survey models? Default
+\code{FALSE}; models can be large.}
 
 \item{reference_label}{Character. Label for the compiled reference index.
 Default \code{"Compiled"}.}
@@ -125,17 +167,48 @@ Default \code{"Compiled"}.}
 Default \code{TRUE}.}
 }
 \value{
-An object of class \code{sdmTMB_survey_comparison}, a list with \code{sanity},
-\code{index} and \code{grid}. The time column of \code{index} is always named \code{year}.
+An object of class \code{sdmTMB_survey_comparison}, a list with
+\itemize{
+\item \code{sanity}: \code{\link[sdmTMB:sanity]{sdmTMB::sanity()}} results, one column per survey;
+\item \code{settings}: one row per survey with the series, number of hauls, years,
+depth band, mesh size, number of grid cells and model settings;
+\item \code{index}: the indices, with columns \code{model} (survey label or
+\code{reference_label}), \code{survey}, \code{domain} (\code{"full"} for the compiled index
+over the whole domain, \code{"survey"} for a survey index over its own
+footprint, \code{"shared"} for both models over the same area), \code{year},
+\code{est}, \code{lwr}, \code{upr}, \code{se}, \code{cv}. The time column is always named
+\code{year};
+\item \code{grid}: per-cell prediction differences between each survey model and
+the compiled model over the shared area (or \code{NULL});
+\item \code{models}: the fitted survey models if \code{keep_models = TRUE}.
+}
+
 Carries \code{crs}, \code{coord_multiplier}, \code{reference_label} and \code{surveys}
 attributes.
 }
 \description{
-Fits separate sdmTMB models for individual survey series and compares the
-resulting indices to a compiled reference index. Survey-specific prediction
-grids are built from the spatial footprint of each survey using a concave
-hull (\code{\link[=make_survey_prediction_region]{make_survey_prediction_region()}}). The output can be plotted as a time
-series, a scatter plot, or a spatial prediction-difference map.
+Fits separate sdmTMB models for individual surveys and compares the
+resulting indices to a compiled reference index. A survey can be one
+survey series or several series combined, and each survey can have its own
+model settings and prediction grid (see \code{\link[=survey_spec]{survey_spec()}}).
+
+Two comparisons are made:
+\itemize{
+\item \strong{Survey area}: each survey index is predicted over the survey's own
+footprint (a concave hull of its hauls, \code{\link[=make_survey_prediction_region]{make_survey_prediction_region()}},
+optionally limited to a depth band) and plotted against the compiled
+index for the whole domain (\code{plot(type = "index")}). The two cover
+different areas, so only their trends are comparable.
+\item \strong{Same area} (\code{same_area = TRUE}): the survey model and the compiled
+model are both predicted over the part of the survey grid inside the
+compiled prediction domain, giving two indices of the same quantity for
+the same area (\code{plot(type = "same_area")}). Differences show where the
+compiled model, informed by all surveys, departs from what the survey
+alone says about its own area.
+}
+
+To find which survey carries the signal in the compiled index, refit the
+compiled model without each survey with \code{\link[=sdmTMB_leave_out]{sdmTMB_leave_out()}}.
 }
 \examples{
 \donttest{
@@ -163,18 +236,26 @@ compiled_index <- sdmTMB::get_index_split(
   compiled_model, newdata = full_grid, area = cell_area, nsplit = 3, silent = TRUE
 )
 
+# EcoS with the compiled settings, WinterS with its own mesh and fields
 sc <- compare_surveys(
   data = sub, compiled_index = compiled_index, compiled_model = compiled_model,
-  surveys = c("EcoS", "WinterS"), newdata = full_grid, object_crs = 32633,
+  surveys = list(
+    EcoS = "EcoS",
+    WinterS = survey_spec("WinterS", mesh_cutoff = 40, spatial = "off")
+  ),
+  newdata = full_grid, object_crs = 32633,
   mesh_cutoff = 50, offset_col = "swept_area", area = cell_area
 )
+sc$settings
 plot(sc)
+plot(sc, type = "same_area")
 plot(sc, type = "scatter")
 plot(sc, type = "spatial", fill_prefix = "Biomass density")
 }
 }
 \seealso{
-\code{\link[=plot.sdmTMB_survey_comparison]{plot.sdmTMB_survey_comparison()}}, \code{\link[=compare_models]{compare_models()}},
+\code{\link[=survey_spec]{survey_spec()}}, \code{\link[=plot.sdmTMB_survey_comparison]{plot.sdmTMB_survey_comparison()}},
+\code{\link[=sdmTMB_leave_out]{sdmTMB_leave_out()}}, \code{\link[=compare_models]{compare_models()}},
 \code{\link[=make_survey_prediction_region]{make_survey_prediction_region()}}
 }
 \author{

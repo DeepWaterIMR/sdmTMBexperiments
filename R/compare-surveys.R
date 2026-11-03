@@ -1,11 +1,165 @@
+#' Define a survey for compare_surveys()
+#'
+#' @description
+#' Describes one survey index for [compare_surveys()]: which survey series it
+#' combines, and any model or prediction-grid settings that differ from the
+#' defaults given to [compare_surveys()]. Every argument except `series`
+#' defaults to `NULL`, meaning "use the [compare_surveys()] default", which in
+#' turn is inherited from the compiled model where possible.
+#'
+#' Surveys differ in coverage, season, depth range and sampling frequency, so a
+#' model that suits the compiled data set rarely suits each survey on its own.
+#' A survey sampled every second year, for example, often needs AR(1) or random
+#' walk spatiotemporal fields to bridge the gaps, and two series that alternate
+#' years can be combined with the series as a fixed effect
+#' (`formula = value ~ 0 + cruiseseries + s(depth)`) and predicted for one of
+#' them (`predict_values = list(cruiseseries = "SeriesA")`).
+#'
+#' @param series Character vector of the survey series (values of the
+#'   `survey_col` column) included in the survey index.
+#' @param formula,family,spatial,spatiotemporal,control Model settings passed
+#'   to [sdmTMB::sdmTMB()].
+#' @param extra_time Optional numeric vector of extra time steps passed to
+#'   [sdmTMB::sdmTMB()], e.g. a year without data inside the series. Indices
+#'   are reported only for years with data.
+#' @param mesh_cutoff Numeric mesh cutoff (in model units, typically km).
+#' @param filter Optional function taking the survey's data frame and
+#'   returning a subset of it, e.g. `function(x) subset(x, lat <= 80)`.
+#'   Applied after selecting `series`.
+#' @param depth_range Optional depth band for the prediction grid: a numeric
+#'   vector `c(min, max)`, or `"data"` to use quantiles of the survey's haul
+#'   depths (see `depth_quantiles` in [compare_surveys()]). Requires a depth
+#'   column in the prediction grid.
+#' @param concavity,buffer Concave-hull settings for the survey footprint (see
+#'   [make_survey_prediction_region()]). `buffer` is in CRS units (typically
+#'   m).
+#' @param newdata Optional prediction grid for this survey, used instead of
+#'   clipping the common `newdata` given to [compare_surveys()] to the survey
+#'   footprint. Useful when the survey extends outside the compiled
+#'   prediction domain (e.g. deeper). If it has no time column, it is
+#'   replicated over the survey years and the years of the compiled model;
+#'   if it has one, it must cover every year of the compiled model for the
+#'   same-area comparison. Must contain every predictor of the survey model
+#'   (and of the compiled model for the same-area comparison).
+#' @param area Grid cell area for `newdata`. Defaults to the `area` given to
+#'   [compare_surveys()].
+#' @param predict_values Optional named list of values assigned to columns of
+#'   the prediction grid before predicting from the survey model, e.g.
+#'   `list(cruiseseries = "EggaN")` to predict a multi-series model for one
+#'   series.
+#'
+#' @return A list of class `sdmTMB_survey_spec`.
+#'
+#' @author Mikko Vihtakari
+#' @seealso [compare_surveys()]
+#' @examples
+#' # Two series that alternate years, combined with the series as a fixed
+#' # effect and AR(1) fields that bridge the alternating gaps
+#' survey_spec(
+#'   c("EggaN", "EggaS"),
+#'   formula = biomass ~ 0 + cruiseseries + s(depth),
+#'   spatiotemporal = "ar1",
+#'   predict_values = list(cruiseseries = "EggaN"),
+#'   depth_range = "data"
+#' )
+#' @export
+survey_spec <- function(
+  series,
+  formula = NULL,
+  family = NULL,
+  spatial = NULL,
+  spatiotemporal = NULL,
+  control = NULL,
+  extra_time = NULL,
+  mesh_cutoff = NULL,
+  filter = NULL,
+  depth_range = NULL,
+  concavity = NULL,
+  buffer = NULL,
+  newdata = NULL,
+  area = NULL,
+  predict_values = NULL
+) {
+  if (!is.character(series) || length(series) < 1) {
+    stop("`series` must be a character vector of survey series names.")
+  }
+  if (!is.null(filter) && !is.function(filter)) {
+    stop("`filter` must be a function that takes and returns a data frame.")
+  }
+  if (!is.null(depth_range) && !identical(depth_range, "data") &&
+      !(is.numeric(depth_range) && length(depth_range) == 2)) {
+    stop("`depth_range` must be NULL, \"data\" or a numeric vector c(min, max).")
+  }
+  if (!is.null(predict_values) &&
+      (!is.list(predict_values) || is.null(names(predict_values)))) {
+    stop("`predict_values` must be a named list.")
+  }
+  structure(
+    list(
+      series = series, formula = formula, family = family, spatial = spatial,
+      spatiotemporal = spatiotemporal, control = control,
+      extra_time = extra_time, mesh_cutoff = mesh_cutoff, filter = filter,
+      depth_range = depth_range, concavity = concavity, buffer = buffer,
+      newdata = newdata, area = area, predict_values = predict_values
+    ),
+    class = "sdmTMB_survey_spec"
+  )
+}
+
+#' Turn the `surveys` argument into a named list of survey specifications
+#' @keywords internal
+#' @noRd
+.resolve_surveys <- function(surveys, data, survey_col) {
+  if (is.null(surveys)) surveys <- unique(as.character(data[[survey_col]]))
+  if (inherits(surveys, "sdmTMB_survey_spec")) {
+    stop("Wrap a single survey_spec() in a named list.")
+  }
+  if (is.character(surveys)) {
+    if (is.null(names(surveys))) names(surveys) <- surveys
+    surveys <- as.list(surveys)
+  }
+  if (!is.list(surveys) || is.null(names(surveys)) || any(names(surveys) == "")) {
+    stop("A list of surveys must be named; the names are used as survey labels.")
+  }
+  specs <- lapply(surveys, function(s) {
+    if (inherits(s, "sdmTMB_survey_spec")) s else survey_spec(as.character(s))
+  })
+  missing_series <- setdiff(
+    unlist(lapply(specs, `[[`, "series")), unique(data[[survey_col]])
+  )
+  if (length(missing_series) > 0) {
+    stop(
+      "Survey series not found in data[[\"", survey_col, "\"]]: ",
+      paste(missing_series, collapse = ", ")
+    )
+  }
+  specs
+}
+
+
 #' Compare individual survey indices to a compiled sdmTMB index
 #'
 #' @description
-#' Fits separate sdmTMB models for individual survey series and compares the
-#' resulting indices to a compiled reference index. Survey-specific prediction
-#' grids are built from the spatial footprint of each survey using a concave
-#' hull ([make_survey_prediction_region()]). The output can be plotted as a time
-#' series, a scatter plot, or a spatial prediction-difference map.
+#' Fits separate sdmTMB models for individual surveys and compares the
+#' resulting indices to a compiled reference index. A survey can be one
+#' survey series or several series combined, and each survey can have its own
+#' model settings and prediction grid (see [survey_spec()]).
+#'
+#' Two comparisons are made:
+#' * **Survey area**: each survey index is predicted over the survey's own
+#'   footprint (a concave hull of its hauls, [make_survey_prediction_region()],
+#'   optionally limited to a depth band) and plotted against the compiled
+#'   index for the whole domain (`plot(type = "index")`). The two cover
+#'   different areas, so only their trends are comparable.
+#' * **Same area** (`same_area = TRUE`): the survey model and the compiled
+#'   model are both predicted over the part of the survey grid inside the
+#'   compiled prediction domain, giving two indices of the same quantity for
+#'   the same area (`plot(type = "same_area")`). Differences show where the
+#'   compiled model, informed by all surveys, departs from what the survey
+#'   alone says about its own area.
+#'
+#' To find which survey carries the signal in the compiled index, refit the
+#' compiled model without each survey with [sdmTMB_leave_out()].
 #'
 #' @param data A data frame containing the modelling data, with a column
 #'   identifying the survey series (see `survey_col`) and coordinate columns
@@ -19,19 +173,27 @@
 #'   call (as with [sdmTMB::update.sdmTMB()]; e.g. family, random fields, time
 #'   column, `spatial_varying`, `priors`, ...), its coordinate columns and CRS
 #'   are inherited, except those overridden by `formula`, `family`, `spatial`,
-#'   `spatiotemporal`, `control` and `offset_col`. Its `data` and `mesh` are
-#'   replaced by each survey's data and a new mesh. A numeric `offset` or
-#'   `weights` vector in the original call cannot be carried over to the
-#'   survey subsets and gives an error (use `offset_col` or column-name
-#'   arguments instead). Spatial prediction differences are computed. When
-#'   `NULL`, spatial differences are skipped, `formula`, `family` and
-#'   `object_crs` must be supplied, and the survey models use only `formula`,
-#'   `family`, `spatial`, `spatiotemporal`, `control`, `offset_col`, a `"year"`
-#'   time column and the `xy_cols` coordinates.
-#' @param surveys Character vector of survey series names to compare. If `NULL`
-#'   (default), all unique values of `data[[survey_col]]` are used.
-#' @param newdata A data frame (the global prediction grid) used to build
-#'   survey-specific grids by spatial filtering.
+#'   `spatiotemporal`, `control` and `offset_col`, or by a [survey_spec()].
+#'   Its `data` and `mesh` are replaced by each survey's data and a new mesh.
+#'   A numeric `offset` or `weights` vector in the original call cannot be
+#'   carried over to the survey subsets and gives an error (use `offset_col`
+#'   or column-name arguments instead). The same-area comparison and spatial
+#'   prediction differences are computed. When `NULL`, these are skipped,
+#'   `formula`, `family` and `object_crs` must be supplied, and the survey
+#'   models use only `formula`, `family`, `spatial`, `spatiotemporal`,
+#'   `control`, `offset_col`, a `"year"` time column and the `xy_cols`
+#'   coordinates (plus any [survey_spec()] settings).
+#' @param surveys Surveys to compare. One of:
+#'   * `NULL` (default): every unique value of `data[[survey_col]]`;
+#'   * a character vector of series names (names, if given, are used as
+#'     labels);
+#'   * a named list whose elements are character vectors of series combined
+#'     into one survey index, or [survey_spec()] objects with
+#'     survey-specific settings, e.g.
+#'     `list(EcoS = "EcoS", "Egga N+S" = survey_spec(c("EggaN", "EggaS"), spatiotemporal = "ar1"))`.
+#' @param newdata A data frame (the compiled prediction grid, with a time
+#'   column) from which survey grids are clipped. Also defines the compiled
+#'   domain for the same-area comparison.
 #' @param object_crs Coordinate reference system. If `NULL`, taken from
 #'   `compiled_model`.
 #' @param formula Model formula. If `NULL`, inherited from `compiled_model`.
@@ -40,8 +202,8 @@
 #'   `compiled_model` (falling back to `"on"`/`"ar1"`).
 #' @param control An [sdmTMB::sdmTMBcontrol()] object. If `NULL`, inherited from
 #'   `compiled_model` (falling back to `sdmTMBcontrol(newton_loops = 2)`).
-#' @param mesh_cutoff Numeric. Mesh cutoff (km) for the survey models. Default
-#'   `30`.
+#' @param mesh_cutoff Numeric. Default mesh cutoff (in `xy_cols` units,
+#'   typically km) for the survey models. Default `30`.
 #' @param offset_col Character. Column in `data` to use as a log-offset (e.g.
 #'   `"swept_area"`). `NULL` (default) means no offset.
 #' @param survey_col Character. Column identifying the survey series. Default
@@ -62,24 +224,55 @@
 #' @param silent Logical. Suppress model output? Default `TRUE`.
 #' @param nsplit Integer. Number of splits for [sdmTMB::get_index_split()].
 #'   Default `3`.
-#' @param n_workers Integer. Number of parallel workers. Default `1`, which
-#'   uses whatever [future::plan()] is currently set. Values `> 1` set a
-#'   temporary `future::multisession` plan.
+#' @param n_workers Integer. Number of parallel workers (surveys are processed
+#'   in parallel). Default `1`, which uses whatever [future::plan()] is
+#'   currently set. Values `> 1` set a temporary `future::multisession` plan.
 #' @param future_seed Logical or integer. Future-compatible random seed.
-#' @param concavity Numeric. Concavity for the survey footprint hulls (see
-#'   [make_survey_prediction_region()]). Default `5`.
+#' @param concavity Numeric. Default concavity for the survey footprint hulls
+#'   (see [make_survey_prediction_region()]). Default `5`.
+#' @param buffer Numeric. Default buffer around the survey footprint hulls, in
+#'   CRS units (typically m). Default `1`.
+#' @param depth_range Default depth band for the survey grids: `NULL` (no
+#'   depth limit, the default), a numeric vector `c(min, max)`, or `"data"`
+#'   for quantiles of each survey's haul depths.
+#' @param depth_quantiles Numeric vector of two probabilities used when
+#'   `depth_range = "data"`. Default `c(0.02, 0.98)`.
+#' @param depth_col Character. Depth column in `data` and the prediction
+#'   grids. Default `"depth"`.
+#' @param same_area Logical. Compute the same-area comparison? Default `TRUE`
+#'   when `compiled_model` is given.
+#' @param compiled_region Optional `sf` polygon of the compiled prediction
+#'   domain, used to limit custom survey grids ([survey_spec()] `newdata`) to
+#'   the compiled domain for the same-area comparison. If `NULL` (default), a
+#'   concave hull of the unique `newdata` coordinates is used. Grids clipped
+#'   from `newdata` are inside the domain by construction.
+#' @param keep_models Logical. Return the fitted survey models? Default
+#'   `FALSE`; models can be large.
 #' @param reference_label Character. Label for the compiled reference index.
 #'   Default `"Compiled"`.
 #' @param verbose Logical. Show progress messages (via \pkg{cli} when installed)?
 #'   Default `TRUE`.
 #'
-#' @return An object of class `sdmTMB_survey_comparison`, a list with `sanity`,
-#'   `index` and `grid`. The time column of `index` is always named `year`.
+#' @return An object of class `sdmTMB_survey_comparison`, a list with
+#'   * `sanity`: [sdmTMB::sanity()] results, one column per survey;
+#'   * `settings`: one row per survey with the series, number of hauls, years,
+#'     depth band, mesh size, number of grid cells and model settings;
+#'   * `index`: the indices, with columns `model` (survey label or
+#'     `reference_label`), `survey`, `domain` (`"full"` for the compiled index
+#'     over the whole domain, `"survey"` for a survey index over its own
+#'     footprint, `"shared"` for both models over the same area), `year`,
+#'     `est`, `lwr`, `upr`, `se`, `cv`. The time column is always named
+#'     `year`;
+#'   * `grid`: per-cell prediction differences between each survey model and
+#'     the compiled model over the shared area (or `NULL`);
+#'   * `models`: the fitted survey models if `keep_models = TRUE`.
+#'
 #'   Carries `crs`, `coord_multiplier`, `reference_label` and `surveys`
 #'   attributes.
 #'
 #' @author Mikko Vihtakari
-#' @seealso [plot.sdmTMB_survey_comparison()], [compare_models()],
+#' @seealso [survey_spec()], [plot.sdmTMB_survey_comparison()],
+#'   [sdmTMB_leave_out()], [compare_models()],
 #'   [make_survey_prediction_region()]
 #'
 #' @importFrom rlang .data
@@ -109,12 +302,19 @@
 #'   compiled_model, newdata = full_grid, area = cell_area, nsplit = 3, silent = TRUE
 #' )
 #'
+#' # EcoS with the compiled settings, WinterS with its own mesh and fields
 #' sc <- compare_surveys(
 #'   data = sub, compiled_index = compiled_index, compiled_model = compiled_model,
-#'   surveys = c("EcoS", "WinterS"), newdata = full_grid, object_crs = 32633,
+#'   surveys = list(
+#'     EcoS = "EcoS",
+#'     WinterS = survey_spec("WinterS", mesh_cutoff = 40, spatial = "off")
+#'   ),
+#'   newdata = full_grid, object_crs = 32633,
 #'   mesh_cutoff = 50, offset_col = "swept_area", area = cell_area
 #' )
+#' sc$settings
 #' plot(sc)
+#' plot(sc, type = "same_area")
 #' plot(sc, type = "scatter")
 #' plot(sc, type = "spatial", fill_prefix = "Biomass density")
 #' }
@@ -144,6 +344,13 @@ compare_surveys <- function(
   n_workers = 1,
   future_seed = TRUE,
   concavity = 5,
+  buffer = 1,
+  depth_range = NULL,
+  depth_quantiles = c(0.02, 0.98),
+  depth_col = "depth",
+  same_area = !is.null(compiled_model),
+  compiled_region = NULL,
+  keep_models = FALSE,
   reference_label = "Compiled",
   verbose = TRUE
 ) {
@@ -153,22 +360,18 @@ compare_surveys <- function(
   if (!survey_col %in% names(data)) {
     stop("`data` must contain the survey column '", survey_col, "'.")
   }
-  if (is.null(surveys)) surveys <- unique(data[[survey_col]])
+  if (same_area && is.null(compiled_model)) {
+    stop("`same_area = TRUE` requires `compiled_model`.")
+  }
+  specs <- .resolve_surveys(surveys, data, survey_col)
+  surveys <- names(specs)
 
-  # Inherit / require model settings ------------------------------------------
+  # Model settings: user-supplied defaults, then per-survey overrides ---------
+  defaults <- list(
+    formula = formula, family = family, spatial = spatial,
+    spatiotemporal = spatiotemporal, control = control
+  )
   if (!is.null(compiled_model)) {
-    # Only user-supplied settings override those of the compiled model call
-    overrides <- list(
-      formula = formula, family = family, spatial = spatial,
-      spatiotemporal = spatiotemporal, control = control
-    )
-    overrides <- overrides[!vapply(overrides, is.null, logical(1))]
-    # offset_col replaces the original offset (set per survey below)
-    if (!is.null(offset_col)) overrides["offset"] <- list(NULL)
-    # Evaluated on the main process so the arguments reach the workers
-    fit_args <- do.call(
-      .refit_args, c(list(compiled_model), overrides, subset_ok = FALSE)
-    )
     xy_cols <- compiled_model$spde$xy_cols
     if (is.null(object_crs)) {
       mesh_crs <- compiled_model$spde$mesh$crs
@@ -186,15 +389,37 @@ compare_surveys <- function(
     if (is.null(formula)) stop("`formula` must be provided when compiled_model = NULL.")
     if (is.null(family)) stop("`family` must be provided when compiled_model = NULL.")
     if (is.null(object_crs)) stop("`object_crs` must be provided when compiled_model = NULL.")
-    if (is.null(spatial)) spatial <- "on"
-    if (is.null(spatiotemporal)) spatiotemporal <- "ar1"
-    if (is.null(control)) control <- sdmTMB::sdmTMBcontrol(newton_loops = 2)
+    if (is.null(spatial)) defaults$spatial <- "on"
+    if (is.null(spatiotemporal)) defaults$spatiotemporal <- "ar1"
+    if (is.null(control)) defaults$control <- sdmTMB::sdmTMBcontrol(newton_loops = 2)
     time_col <- "year"
-    fit_args <- list(
-      formula = formula, family = family, spatial = spatial,
-      spatiotemporal = spatiotemporal, time = time_col, control = control
-    )
   }
+
+  # Arguments of each survey model, evaluated on the main process so that they
+  # reach the parallel workers
+  model_args <- c("formula", "family", "spatial", "spatiotemporal", "control",
+                  "extra_time")
+  fit_args <- lapply(specs, function(s) {
+    overrides <- defaults
+    for (nm in model_args) if (!is.null(s[[nm]])) overrides[nm] <- list(s[[nm]])
+    overrides <- overrides[!vapply(overrides, is.null, logical(1))]
+    if (!is.null(compiled_model)) {
+      # offset_col replaces the original offset (set per survey)
+      if (!is.null(offset_col)) overrides["offset"] <- list(NULL)
+      do.call(.refit_args, c(list(compiled_model), overrides, subset_ok = FALSE))
+    } else {
+      c(overrides, list(time = time_col))
+    }
+  })
+
+  specs <- lapply(specs, function(s) {
+    if (is.null(s$mesh_cutoff)) s$mesh_cutoff <- mesh_cutoff
+    if (is.null(s$concavity)) s$concavity <- concavity
+    if (is.null(s$buffer)) s$buffer <- buffer
+    if (is.null(s$depth_range)) s["depth_range"] <- list(depth_range)
+    s
+  })
+
   if (!all(xy_cols %in% names(data)) || !all(xy_cols %in% names(newdata))) {
     stop("`data` and `newdata` must contain the coordinate columns ",
          paste(xy_cols, collapse = ", "), ".")
@@ -203,132 +428,81 @@ compare_surveys <- function(
       !"year" %in% names(compiled_index)) {
     names(compiled_index)[names(compiled_index) == time_col] <- "year"
   }
-  # Track grid rows through the spatial clipping so a per-row `area` vector
-  # can be subset to each survey's grid
-  newdata$.sdmTMBexperiments_row <- seq_len(nrow(newdata))
-  .subset_area(area, TRUE, nrow(newdata)) # validate the length
+  # Carry a per-row `area` vector with the grid rows through the clipping
+  if (is.numeric(area) && length(area) > 1) {
+    .subset_area(area, TRUE, nrow(newdata)) # validate the length
+    newdata$.area <- area
+    area <- ".area"
+  }
+
+  if (same_area && is.null(compiled_region) &&
+      any(vapply(specs, function(s) !is.null(s$newdata), logical(1)))) {
+    compiled_region <- make_survey_prediction_region(
+      unique(newdata[xy_cols]), crs = object_crs, xy_cols = xy_cols,
+      coord_multiplier = coord_multiplier, concavity = concavity,
+      buffer = buffer
+    )
+  }
+  compiled_depth <- if (depth_col %in% names(newdata)) {
+    range(newdata[[depth_col]], na.rm = TRUE)
+  } else {
+    NULL
+  }
 
   use_cli <- isTRUE(verbose) && requireNamespace("cli", quietly = TRUE)
   step <- function(msg) if (use_cli) cli::cli_progress_step(msg, spinner = TRUE)
   done <- function() if (use_cli) cli::cli_progress_done()
-  ok <- function(msg) if (use_cli) cli::cli_alert_success(msg)
   bad <- function(msg) if (use_cli) cli::cli_alert_danger("{msg}")
 
   old_parallel <- .setup_parallel(n_workers)
   on.exit(.restore_parallel(old_parallel), add = TRUE)
 
-  # Model fitting per survey series -------------------------------------------
-  step(paste("Fitting", length(surveys), "survey models"))
-  survey_mods <- future.apply::future_lapply(
+  # Fit, grid and index per survey -------------------------------------------
+  step(paste("Fitting and predicting", length(surveys), "survey models"))
+  res <- future.apply::future_lapply(
     surveys,
-    function(survey) {
-      x <- dplyr::filter(data, .data[[survey_col]] == survey)
-      mesh <- sdmTMB::make_mesh(x, xy_cols = xy_cols, cutoff = mesh_cutoff)
-      args <- fit_args
-      if (!is.null(offset_col)) args$offset <- log(x[[offset_col]])
-      mod <- try(
-        .refit(args, data = x, mesh = mesh, silent = silent),
-        silent = TRUE
-      )
-      if (inherits(mod, "try-error")) {
-        bad(paste0(survey, ": model failed: ",
-                   conditionMessage(attr(mod, "condition"))))
-      } else {
-        ok(paste0(survey, ": model OK"))
-      }
-      list(mod = mod, data = x, mesh = mesh, model = survey)
-    },
-    future.seed = future_seed
-  )
-  names(survey_mods) <- surveys
-  done()
-
-  # Survey-specific prediction grids ------------------------------------------
-  step(paste("Building", length(surveys), "survey prediction grids"))
-  prediction_grids <- future.apply::future_lapply(
-    survey_mods,
-    function(k) {
-      survey_data <- if (!inherits(k$mod, "try-error")) k$mod$data else k$data
-      region <- make_survey_prediction_region(
-        survey_data, crs = object_crs, xy_cols = xy_cols,
-        coord_multiplier = coord_multiplier, concavity = concavity
-      )
-      .clip_points_to_region(
-        newdata, region, xy_cols = xy_cols, coord_multiplier = coord_multiplier
+    function(label) {
+      .compare_one_survey(
+        label = label, spec = specs[[label]], fit_args = fit_args[[label]],
+        data = data, compiled_model = compiled_model, newdata = newdata,
+        object_crs = object_crs, survey_col = survey_col, time_col = time_col,
+        xy_cols = xy_cols, coord_multiplier = coord_multiplier,
+        offset_col = offset_col, depth_col = depth_col,
+        depth_quantiles = depth_quantiles, same_area = same_area,
+        compiled_region = compiled_region, compiled_depth = compiled_depth,
+        area = area, bias_correct = bias_correct, level = level,
+        nsplit = nsplit, silent = silent, reference_label = reference_label,
+        keep_models = keep_models
       )
     },
     future.seed = future_seed
   )
+  names(res) <- surveys
   done()
-
-  # Sanity checks -------------------------------------------------------------
-  model_sanity <- .sanity_table(lapply(survey_mods, `[[`, "mod"))
-
-  # Index calculation ---------------------------------------------------------
-  step(paste("Computing", length(surveys), "survey indices"))
-  survey_indices <- future.apply::future_lapply(
-    seq_along(survey_mods),
-    function(l) {
-      nd <- prediction_grids[[l]]
-      idx <- .safe_index(
-        mod = survey_mods[[l]]$mod, newdata = nd,
-        time_col = time_col, nsplit = nsplit, bias_correct = bias_correct,
-        level = level,
-        area = .subset_area(area, nd$.sdmTMBexperiments_row, nrow(newdata)),
-        silent = silent
-      )
-      ok(paste0(survey_mods[[l]]$model, ": index done"))
-      tibble::add_column(idx, model = survey_mods[[l]]$model, .before = 1)
-    },
-    future.seed = future_seed
-  ) |>
-    dplyr::bind_rows()
-  done()
-
-  combined_index <- dplyr::bind_rows(
-    survey_indices,
-    dplyr::mutate(compiled_index, model = reference_label)
-  )
-
-  # Spatial prediction differences --------------------------------------------
-  if (!is.null(compiled_model)) {
-    step("Computing spatial prediction differences")
-    pred_diff <- future.apply::future_lapply(
-      seq_along(survey_mods),
-      function(i) {
-        k <- survey_mods[[i]]
-        nd <- prediction_grids[[i]]
-        if (inherits(k$mod, "try-error")) {
-          out <- data.frame(
-            reference_model = reference_label, survey = surveys[i],
-            year = nd[[time_col]], X = nd[[xy_cols[1]]], Y = nd[[xy_cols[2]]],
-            est = NA, ref_est = NA, diff = NA, pr_diff = NA, mean_pr_diff = NA
-          )
-        } else {
-          base <- .pred_diff_base(k$mod, compiled_model, nd, time_col, xy_cols)
-          base$reference_model <- reference_label
-          base$survey <- surveys[i]
-          out <- base |>
-            dplyr::group_by(.data$reference_model, .data$survey,
-                            .data$X, .data$Y) |>
-            dplyr::mutate(
-              mean_pr_diff = 100 * mean(.data$diff, na.rm = TRUE) /
-                mean(.data$ref_est, na.rm = TRUE)
-            ) |>
-            dplyr::ungroup()
-        }
-        ok(paste0(surveys[i], ": spatial diff done"))
-        out
-      },
-      future.seed = future_seed
-    )
-    names(pred_diff) <- surveys
-    done()
-  } else {
-    pred_diff <- NULL
+  for (label in surveys) {
+    if (!is.null(res[[label]]$error)) {
+      bad(paste0(label, ": model failed: ", res[[label]]$error))
+    }
   }
 
-  out <- list(sanity = model_sanity, index = combined_index, grid = pred_diff)
+  combined_index <- dplyr::bind_rows(c(
+    list(dplyr::mutate(compiled_index, model = reference_label,
+                       survey = NA_character_, domain = "full")),
+    unname(lapply(res, `[[`, "index"))
+  ))
+  if (!"cv" %in% names(combined_index)) combined_index$cv <- NA_real_
+  combined_index$cv <- ifelse(
+    is.na(combined_index$cv) & !is.na(combined_index$se),
+    sqrt(exp(combined_index$se^2) - 1), combined_index$cv
+  )
+
+  out <- list(
+    sanity = .sanity_from_list(lapply(res, `[[`, "sanity")),
+    settings = dplyr::bind_rows(unname(lapply(res, `[[`, "settings"))),
+    index = combined_index,
+    grid = if (!is.null(compiled_model)) lapply(res, `[[`, "grid") else NULL
+  )
+  if (keep_models) out$models <- lapply(res, `[[`, "mod")
   class(out) <- "sdmTMB_survey_comparison"
   attributes(out)$crs <- object_crs
   attributes(out)$coord_multiplier <- coord_multiplier
@@ -337,13 +511,222 @@ compare_surveys <- function(
   out
 }
 
+#' Sanity table from a list of unlisted sanity() results
+#'
+#' Like `.sanity_table()`, but from results already computed on the workers
+#' (so the fitted models need not be returned). `NULL` marks a failed fit.
+#' @keywords internal
+#' @noRd
+.sanity_from_list <- function(checks) {
+  fitted <- !vapply(checks, is.null, logical(1))
+  if (!any(fitted)) {
+    out <- as.data.frame(matrix(NA, nrow = 1, ncol = length(checks)))
+    names(out) <- names(checks)
+    row.names(out) <- "all_ok"
+    return(out)
+  }
+  check_names <- names(checks[[which(fitted)[1]]])
+  out <- lapply(checks, function(x) {
+    if (is.null(x)) stats::setNames(rep(NA, length(check_names)), check_names)
+    else x[check_names]
+  })
+  as.data.frame(out, row.names = check_names, check.names = FALSE)
+}
+
+#' Fit, grid and index one survey for compare_surveys()
+#' @keywords internal
+#' @noRd
+.compare_one_survey <- function(
+  label, spec, fit_args, data, compiled_model, newdata, object_crs,
+  survey_col, time_col, xy_cols, coord_multiplier, offset_col, depth_col,
+  depth_quantiles, same_area, compiled_region, compiled_depth, area,
+  bias_correct, level, nsplit, silent, reference_label, keep_models
+) {
+  x <- data[data[[survey_col]] %in% spec$series, , drop = FALSE]
+  if (!is.null(spec$filter)) x <- spec$filter(x)
+  x <- droplevels(as.data.frame(x))
+  if (nrow(x) == 0) stop("No data left for survey '", label, "'.")
+  years <- sort(unique(x[[time_col]]))
+
+  # Prediction grid over the survey footprint ----
+  depth_band <- spec$depth_range
+  if (identical(depth_band, "data")) {
+    if (!depth_col %in% names(x)) {
+      stop("`depth_range = \"data\"` needs a '", depth_col, "' column in data.")
+    }
+    depth_band <- stats::quantile(
+      x[[depth_col]], depth_quantiles, na.rm = TRUE, names = FALSE
+    )
+  }
+
+  custom_grid <- !is.null(spec$newdata)
+  grid_area <- area
+  if (custom_grid) {
+    grid <- as.data.frame(spec$newdata)
+    if (!time_col %in% names(grid)) {
+      grid_years <- sort(unique(c(years, compiled_model$fitted_time)))
+      grid <- sdmTMB::replicate_df(grid, time_col, grid_years)
+    }
+    grid_area <- spec$area
+    if (is.null(grid_area)) {
+      if (is.character(area) && !area %in% names(grid)) {
+        stop("Give the cell area of the custom grid of '", label,
+             "' with survey_spec(area = ).")
+      }
+      grid_area <- area
+    }
+    if (is.numeric(grid_area) && length(grid_area) > 1) {
+      .subset_area(grid_area, TRUE, nrow(grid))
+      grid$.area <- grid_area
+      grid_area <- ".area"
+    }
+  } else {
+    region <- make_survey_prediction_region(
+      x, crs = object_crs, xy_cols = xy_cols,
+      coord_multiplier = coord_multiplier, concavity = spec$concavity,
+      buffer = spec$buffer
+    )
+    grid <- .clip_points_to_region(
+      newdata, region, xy_cols = xy_cols, coord_multiplier = coord_multiplier
+    )
+  }
+  if (!is.null(depth_band)) {
+    if (!depth_col %in% names(grid)) {
+      stop("A depth range was given for '", label, "' but the prediction grid ",
+           "has no '", depth_col, "' column.")
+    }
+    grid <- grid[!is.na(grid[[depth_col]]) &
+                   grid[[depth_col]] >= depth_band[1] &
+                   grid[[depth_col]] <= depth_band[2], , drop = FALSE]
+  }
+  # The compiled index needs all its fitted years in the prediction grid
+  grid_all <- grid
+  grid <- grid[grid[[time_col]] %in% years, , drop = FALSE]
+  if (nrow(grid) == 0) stop("The prediction grid for '", label, "' is empty.")
+
+  # Part of the survey grid inside the compiled domain, over all years of the
+  # compiled model (`shared_all`) and over the survey years (`shared`)
+  shared <- shared_all <- NULL
+  if (!is.null(compiled_model)) {
+    shared <- grid_all
+    if (custom_grid && !is.null(compiled_region)) {
+      shared <- .clip_points_to_region(
+        shared, compiled_region, xy_cols = xy_cols,
+        coord_multiplier = coord_multiplier
+      )
+    }
+    if (custom_grid && !is.null(compiled_depth) && depth_col %in% names(shared)) {
+      shared <- shared[shared[[depth_col]] >= compiled_depth[1] &
+                         shared[[depth_col]] <= compiled_depth[2], , drop = FALSE]
+    }
+    shared_all <- shared[shared[[time_col]] %in% compiled_model$fitted_time, , drop = FALSE]
+    shared <- shared_all[shared_all[[time_col]] %in% years, , drop = FALSE]
+    if (nrow(shared) == 0) shared <- shared_all <- NULL
+  }
+
+  survey_values <- function(nd) {
+    for (nm in names(spec$predict_values)) nd[[nm]] <- spec$predict_values[[nm]]
+    nd
+  }
+
+  # Model ----
+  mesh <- sdmTMB::make_mesh(x, xy_cols = xy_cols, cutoff = spec$mesh_cutoff)
+  args <- fit_args
+  if (!is.null(offset_col)) args$offset <- log(x[[offset_col]])
+  mod <- try(.refit(args, data = x, mesh = mesh, silent = silent), silent = TRUE)
+  fitted <- !inherits(mod, "try-error")
+
+  index_rows <- function(m, nd, model_label, domain) {
+    idx <- .safe_index(
+      mod = m, newdata = nd, time_col = time_col, nsplit = nsplit,
+      bias_correct = bias_correct, level = level, area = grid_area,
+      silent = silent, label = paste(model_label, domain)
+    )
+    if (time_col != "year" && time_col %in% names(idx)) {
+      names(idx)[names(idx) == time_col] <- "year"
+    }
+    idx <- idx[idx$year %in% years, , drop = FALSE]
+    tibble::add_column(
+      idx, model = model_label, survey = label, domain = domain, .before = 1
+    )
+  }
+
+  index <- list(index_rows(if (fitted) mod else NULL, survey_values(grid), label, "survey"))
+  if (same_area && !is.null(shared)) {
+    index <- c(index, list(
+      index_rows(if (fitted) mod else NULL, survey_values(shared), label, "shared"),
+      index_rows(compiled_model, shared_all, reference_label, "shared")
+    ))
+  }
+
+  # Spatial prediction differences over the shared area ----
+  diff_grid <- NULL
+  if (!is.null(shared)) {
+    if (fitted) {
+      base <- .pred_diff_base(
+        mod, compiled_model, survey_values(shared), time_col, xy_cols
+      )
+      base$reference_model <- reference_label
+      base$survey <- label
+      diff_grid <- base |>
+        dplyr::group_by(.data$reference_model, .data$survey, .data$X, .data$Y) |>
+        dplyr::mutate(
+          mean_pr_diff = 100 * mean(.data$diff, na.rm = TRUE) /
+            mean(.data$ref_est, na.rm = TRUE)
+        ) |>
+        dplyr::ungroup()
+    } else {
+      diff_grid <- data.frame(
+        reference_model = reference_label, survey = label,
+        year = shared[[time_col]],
+        X = shared[[xy_cols[1]]], Y = shared[[xy_cols[2]]],
+        est = NA, ref_est = NA, diff = NA, pr_diff = NA, mean_pr_diff = NA
+      )
+    }
+  }
+
+  st <- fit_args$spatiotemporal
+  fam <- fit_args$family
+  form <- fit_args$formula
+  settings <- tibble::tibble(
+    survey = label,
+    series = paste(spec$series, collapse = ", "),
+    n_hauls = nrow(x),
+    n_years = length(years),
+    first_year = min(years),
+    last_year = max(years),
+    formula = paste(deparse(if (is.list(form)) form[[1]] else form), collapse = " "),
+    family = if (is.null(fam)) NA_character_ else paste(fam$family, collapse = "/"),
+    spatiotemporal = if (is.null(st)) NA_character_ else
+      paste(unique(tolower(unlist(st))), collapse = "/"),
+    extra_time = paste(fit_args$extra_time, collapse = ", "),
+    mesh_cutoff = spec$mesh_cutoff,
+    mesh_vertices = mesh$mesh$n,
+    min_depth = if (is.null(depth_band)) NA_real_ else depth_band[1],
+    max_depth = if (is.null(depth_band)) NA_real_ else depth_band[2],
+    grid_cells = nrow(unique(grid[xy_cols])),
+    shared_cells = if (is.null(shared)) 0L else nrow(unique(shared[xy_cols]))
+  )
+
+  list(
+    mod = if (keep_models) mod else NULL,
+    error = if (fitted) NULL else conditionMessage(attr(mod, "condition")),
+    sanity = if (fitted) unlist(sdmTMB::sanity(mod, silent = TRUE)) else NULL,
+    index = dplyr::bind_rows(index),
+    grid = diff_grid,
+    settings = settings
+  )
+}
+
 #' Plot survey comparison results
 #'
 #' @description
-#' Plots the results of [compare_surveys()] as a time series of indices
-#' (`type = "index"`), a scatter plot of survey vs compiled indices
-#' (`type = "scatter"`), or a spatial prediction-difference map
-#' (`type = "spatial"`, on a [ggOceanMaps::basemap()]).
+#' Plots the results of [compare_surveys()] as a time series of survey
+#' indices over each survey's own area against the compiled index over the
+#' whole domain (`type = "index"`), survey and compiled indices over the same
+#' area, one panel per survey (`type = "same_area"`), a scatter plot of survey
+#' vs compiled indices (`type = "scatter"`), or a spatial prediction-difference
+#' map (`type = "spatial"`, on a [ggOceanMaps::basemap()]).
 #'
 #' @details
 #' For `type = "spatial"`, each grid cell is compared between a survey's
@@ -368,7 +751,8 @@ compare_surveys <- function(
 #'   in the denominator instead of each individual year's value.
 #'
 #' @param x An object of class `sdmTMB_survey_comparison`.
-#' @param type Character. `"index"` (default), `"scatter"` or `"spatial"`.
+#' @param type Character. `"index"` (default), `"same_area"`, `"scatter"` or
+#'   `"spatial"`.
 #' @param index_divisor Optional numeric divisor applied to index values.
 #' @param unit Character. Unit label. If `NA`, `"Index value"` is used.
 #' @param viridis Logical. Use the viridis palette for survey series? Default
@@ -425,7 +809,8 @@ compare_surveys <- function(
 #'   surveys = c("EcoS", "WinterS"), newdata = full_grid, object_crs = 32633,
 #'   mesh_cutoff = 50, offset_col = "swept_area", area = cell_area
 #' )
-#' plot(sc)                                              # scaled index time series
+#' plot(sc)                                              # index time series
+#' plot(sc, type = "same_area")                          # same-area indices
 #' plot(sc, type = "scatter", annotate_fit = TRUE)       # survey vs compiled
 #' plot(sc, type = "spatial", fill_prefix = "Biomass density") # prediction differences
 #' }
@@ -448,19 +833,27 @@ plot.sdmTMB_survey_comparison <- function(
 ) {
   surveys <- attributes(x)$surveys
   ref <- attributes(x)$reference_label
+  type <- match.arg(type, c("index", "same_area", "scatter", "spatial"))
+
+  # Objects from versions before the same-area comparison have no domain
+  if (!"domain" %in% names(x$index)) {
+    x$index$domain <- ifelse(x$index$model == ref, "full", "survey")
+    x$index$survey <- ifelse(x$index$model == ref, NA_character_, x$index$model)
+  }
+  scale_index <- function(dat) {
+    if (is.null(index_divisor)) return(dat)
+    dplyr::mutate(
+      dat, est = .data$est / index_divisor,
+      lwr = .data$lwr / index_divisor, upr = .data$upr / index_divisor
+    )
+  }
 
   survey_colors <- stats::setNames(
     .series_colors(length(surveys), viridis), surveys
   )
 
   if (type == "index") {
-    dat <- x$index
-    if (!is.null(index_divisor)) {
-      dat <- dplyr::mutate(
-        dat, est = .data$est / index_divisor,
-        lwr = .data$lwr / index_divisor, upr = .data$upr / index_divisor
-      )
-    }
+    dat <- scale_index(dplyr::filter(x$index, .data$domain %in% c("full", "survey")))
     index_colors <- c(stats::setNames("black", ref), survey_colors)
     fill_colors <- dplyr::recode(index_colors, "black" = "grey")
 
@@ -487,14 +880,44 @@ plot.sdmTMB_survey_comparison <- function(
     )
   }
 
-  if (type == "scatter") {
-    dat <- x$index
-    if (!is.null(index_divisor)) {
-      dat <- dplyr::mutate(
-        dat, est = .data$est / index_divisor,
-        lwr = .data$lwr / index_divisor, upr = .data$upr / index_divisor
-      )
+  if (type == "same_area") {
+    dat <- scale_index(dplyr::filter(x$index, .data$domain == "shared"))
+    if (nrow(dat) == 0) {
+      stop("No same-area indices. Re-run compare_surveys() with a compiled_model ",
+           "and same_area = TRUE.")
     }
+    dat$survey <- factor(dat$survey, levels = surveys)
+    src_levels <- c(ref, "Survey model")
+    dat$source <- factor(ifelse(dat$model == ref, ref, "Survey model"),
+                         levels = src_levels)
+    return(
+      ggplot2::ggplot(dat, ggplot2::aes(
+        x = .data$year, y = .data$est, ymin = .data$lwr, ymax = .data$upr,
+        color = .data$source, fill = .data$source
+      )) +
+        ggplot2::geom_ribbon(color = NA, alpha = 0.2) +
+        ggplot2::geom_path() +
+        ggplot2::facet_wrap(~survey, scales = "free_y") +
+        ggplot2::scale_color_manual(
+          values = stats::setNames(c("black", "#D55E00"), src_levels)
+        ) +
+        ggplot2::scale_fill_manual(
+          values = stats::setNames(c("grey", "#D55E00"), src_levels)
+        ) +
+        ggplot2::labs(
+          y = if (!is.na(unit)) paste0("Index value (", unit, ")") else "Index value",
+          x = "Year", color = "Model", fill = "Model"
+        ) +
+        ggplot2::expand_limits(y = 0) +
+        ggplot2::theme_classic(base_size = base_size) +
+        .index_axis_layers() +
+        ggplot2::theme(legend.position = "bottom",
+                       strip.background = ggplot2::element_blank())
+    )
+  }
+
+  if (type == "scatter") {
+    dat <- scale_index(dplyr::filter(x$index, .data$domain %in% c("full", "survey")))
     ref_dat <- dat |>
       dplyr::filter(.data$model == ref) |>
       dplyr::select("year", ref_est = "est")

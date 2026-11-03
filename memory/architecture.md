@@ -3,7 +3,9 @@
 ## Source layout (kebab-case, sdmTMB-style)
 - `R/compare-models.R` — `compare_models()` + `plot.sdmTMB_model_comparison()`
 - `R/compare-meshes.R` — `compare_meshes()` + `plot.sdmTMB_mesh_comparison()`
-- `R/compare-surveys.R` — `compare_surveys()` + `plot.sdmTMB_survey_comparison()`
+- `R/compare-surveys.R` — `survey_spec()`, `compare_surveys()` (+ internal
+  `.resolve_surveys()`, `.compare_one_survey()`) + `plot.sdmTMB_survey_comparison()`
+- `R/leave-out.R` — `sdmTMB_leave_out()` + `plot.sdmTMB_leave_out()`
 - `R/retro.R` — `sdmTMB_retro()` + `plot.sdmTMB_retro()`
 - `R/mesh-cv.R` — `sdmTMB_mesh_cv()` + `plot.sdmTMB_mesh_cv()`
 - `R/prediction-grid.R` — `make_survey_prediction_region()`,
@@ -68,7 +70,7 @@
 
 ## S3 classes
 `sdmTMB_model_comparison`, `sdmTMB_mesh_comparison`, `sdmTMB_survey_comparison`,
-`sdmTMB_retro`, `sdmTMB_mesh_cv`, `sdmTMB_selection` — each with a `plot()`
+`sdmTMB_retro`, `sdmTMB_mesh_cv`, `sdmTMB_selection`, `sdmTMB_leave_out` — each with a `plot()`
 method (`sdmTMB_selection` also has `print()`).
 
 ## The model-selection contract (`R/model-selection.R`)

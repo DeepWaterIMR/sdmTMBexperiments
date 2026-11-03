@@ -1,6 +1,6 @@
 # Project overview
 
-**sdmTMBexperiments** is a public R package (v0.1.7, GPL-3) of experimental
+**sdmTMBexperiments** is a public R package (v0.1.8, GPL-3) of experimental
 helper functions for fitted [sdmTMB](https://github.com/sdmTMB/sdmTMB) models.
 
 ## Purpose
@@ -18,7 +18,8 @@ dataset, which is generic demonstration data with documented provenance.
 ## What it provides
 - Model comparison (`compare_models()`), mesh sensitivity (`compare_meshes()`),
   retrospective analysis (`sdmTMB_retro()`), survey comparison
-  (`compare_surveys()`).
+  (`compare_surveys()`, `survey_spec()`), leave-one-out influence of surveys,
+  cruises or hauls (`sdmTMB_leave_out()`).
 - Prediction-grid helpers (`make_survey_prediction_region()`,
   `make_prediction_grid()`).
 - Spatial mesh cross-validation (`sdmTMB_mesh_cv()`).

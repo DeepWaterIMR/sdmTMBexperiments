@@ -9,6 +9,7 @@ make_prediction_grid(
   resolution,
   crs = NULL,
   coord_multiplier = 1000,
+  min_depth = NULL,
   max_depth = NULL,
   depth_fun = NULL,
   bathy_style = "raster_continuous"
@@ -28,13 +29,15 @@ CRS units.}
 \item{coord_multiplier}{Numeric factor to convert model units to CRS units.
 Default \code{1000}.}
 
-\item{max_depth}{Optional numeric. If supplied, grid cells with depth
-outside \code{c(1, max_depth)} are dropped. Turns on depth extraction (see
+\item{min_depth, max_depth}{Optional numeric depth limits. If either is
+supplied, grid cells with depth outside \code{c(min_depth, max_depth)} are
+dropped (\code{min_depth} defaults to \code{1}, which removes land, and \code{max_depth}
+to \code{Inf}). Supplying either turns on depth extraction (see
 \code{depth_fun}/\code{bathy_style}).}
 
 \item{depth_fun}{Optional function taking an \code{sf} points object and
 returning a numeric vector of (positive) depths. Only used when
-\code{max_depth} is set. If \code{NULL} (default) while \code{max_depth} is set, depth is
+\code{min_depth} or \code{max_depth} is set. If \code{NULL} (default), depth is
 extracted automatically via \code{\link[ggOceanMaps:get_depth]{ggOceanMaps::get_depth()}} using \code{bathy_style}
 — supply your own \code{depth_fun} to use a different bathymetry source (e.g. a
 specific GEBCO file via \code{bathy.style = "raster_user"} and
@@ -73,6 +76,13 @@ grid <- make_prediction_grid(
 )
 range(grid$depth)
 plot(grid)
+
+# A depth band, e.g. the depth range a slope survey targets
+band <- make_prediction_grid(
+  region, resolution = 20, min_depth = 400, max_depth = 1350,
+  depth_fun = sebastes_depth
+)
+range(band$depth)
 }
 }
 \seealso{

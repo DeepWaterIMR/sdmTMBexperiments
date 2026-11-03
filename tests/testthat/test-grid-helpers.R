@@ -75,3 +75,16 @@ test_that("plot.sdmTMB_prediction_grid errors without a CRS", {
   class(d) <- c("sdmTMB_prediction_grid", class(d))
   expect_error(plot(d), "crs")
 })
+
+test_that("make_prediction_grid applies a depth band", {
+  skip_if_not_installed("concaveman")
+  data(sebastes)
+  d <- subset(sebastes, cruiseseries == "EggaN")
+  region <- make_survey_prediction_region(d, crs = 32633)
+  depth_fun <- function(pts) seq(0, 2000, length.out = nrow(pts))
+  grid <- make_prediction_grid(region, resolution = 20, min_depth = 400,
+                               max_depth = 1350, depth_fun = depth_fun)
+  expect_true(all(grid$depth >= 400 & grid$depth <= 1350))
+  expect_error(make_prediction_grid(region, resolution = 20, min_depth = 500,
+                                    max_depth = 400, depth_fun = depth_fun))
+})

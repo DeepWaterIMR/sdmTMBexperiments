@@ -237,3 +237,53 @@ plot(sc, type = "spatial", spatial_response = "mean") # prediction differences
 ```
 
 The individual survey indices are lower than the compiled index because the survey models are fit to a smaller spatial domain than the compiled model.
+### Survey-specific settings and the same-area comparison
+
+Surveys differ in coverage, season, depth range and sampling frequency, so a model that suits the compiled data set rarely suits each survey on its own. `survey_spec()` gives a survey its own series, model settings and prediction grid. A survey can combine several series: two series that alternate years, for example, can be fitted together with the series as a fixed effect, AR(1) spatiotemporal fields that bridge the gaps, and predictions for one of the series (`predict_values`). `depth_range = "data"` limits the prediction grid to the 2–98% quantiles of the survey's haul depths. Settings not given in `survey_spec()` are taken from the `compare_surveys()` arguments, which in turn are inherited from the compiled model.
+
+Because each survey index covers only its own area, it is not directly comparable with the compiled index. With `same_area = TRUE` (the default when `compiled_model` is given), both the survey model and the compiled model are also predicted over the part of the survey grid inside the compiled domain. `plot(type = "same_area")` then shows two estimates of the same quantity for the same area: where they differ, the compiled model, informed by all surveys, departs from what the survey alone says about its own area. `sc$settings` lists the settings used for each survey.
+
+```{r compare-surveys-spec, message = FALSE}
+sc2 <- compare_surveys(
+  data = sub,
+  compiled_index = compiled_index,
+  compiled_model = compiled_model,
+  surveys = list(
+    EcoS = "EcoS",
+    "EcoS + WinterS" = survey_spec(
+      c("EcoS", "WinterS"),
+      formula = biomass ~ 0 + cruiseseries,
+      spatiotemporal = "ar1",
+      predict_values = list(cruiseseries = "EcoS"),
+      depth_range = "data"
+    )
+  ),
+  newdata = full_grid,
+  object_crs = 32633,
+  mesh_cutoff = 50,
+  offset_col = "swept_area",
+  area = cell_area,
+  verbose = FALSE
+)
+
+sc2$settings[c("survey", "series", "spatiotemporal", "min_depth", "max_depth", "grid_cells")]
+plot(sc2, type = "same_area", index_divisor = 1e6, unit = "kt")
+```
+
+### Which survey carries the signal?
+
+`sdmTMB_leave_out()` refits a model once without each survey series (or cruise, or haul) and compares the resulting index with a refit to all data. Years with no data left after removing a series are kept in the refit as `extra_time` and reported as `NA`. A large change when a series is removed shows that the series drives the compiled index in those years. `index = "split"` returns confidence intervals, which suits a few identifiers such as survey series; the default plug-in index is faster for screening many hauls.
+
+```{r leave-out, message = FALSE}
+lo <- sdmTMB_leave_out(
+  compiled_model,
+  id_col = "cruiseseries",
+  newdata = full_grid,
+  area = cell_area,
+  index = "split",
+  verbose = FALSE
+)
+
+lo$influence
+plot(lo, index_divisor = 1e6, unit = "kt")
+```

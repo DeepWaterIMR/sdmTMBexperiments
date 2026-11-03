@@ -120,9 +120,13 @@ function; see `?sdmTMB_selection`):
 
 ### Survey comparison (uses the bundled `sebastes` data)
 
-`compare_surveys()` fits a separate model per survey series, builds a
+`compare_surveys()` fits a separate model per survey, builds a
 survey-specific prediction grid from each survey's spatial footprint, and
-compares to a compiled reference index.
+compares to a compiled reference index, both over the survey's own area and
+over the same cells (`plot(type = "same_area")`). `survey_spec()` gives a
+survey its own series (several can be combined), model settings, depth band
+and grid. `sdmTMB_leave_out()` refits the compiled model without each survey
+series to show which series carries the signal.
 
 ```r
 data(sebastes)

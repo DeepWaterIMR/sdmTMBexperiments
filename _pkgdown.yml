@@ -26,6 +26,8 @@ reference:
 - title: Survey comparison and prediction grids
   contents:
   - compare_surveys
+  - survey_spec
+  - sdmTMB_leave_out
   - make_survey_prediction_region
   - make_prediction_grid
 - title: Plotting

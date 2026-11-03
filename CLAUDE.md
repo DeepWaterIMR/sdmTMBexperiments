@@ -76,7 +76,8 @@ is `future_seed` everywhere. See [memory/naming-conventions.md](memory/naming-co
   `best_candidate()` (look the winner up in the column, never by row position).
 - Comparisons return `sdmTMB_model_comparison`, `sdmTMB_mesh_comparison`,
   `sdmTMB_survey_comparison`, each with a `plot()` method (index / spatial, and
-  scatter for surveys).
+  scatter and same-area for surveys). Surveys are defined with `survey_spec()`.
+- `sdmTMB_leave_out()` → `sdmTMB_leave_out` (+ `plot`).
 - `sdmTMB_retro()` → `sdmTMB_retro` (+ `plot`); `sdmTMB_mesh_cv()` →
   `sdmTMB_mesh_cv` (+ `plot`).
 - `mohns_rho()` is the shared engine for the Mohn's-rho annotations.

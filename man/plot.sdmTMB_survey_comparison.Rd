@@ -23,7 +23,8 @@
 \arguments{
 \item{x}{An object of class \code{sdmTMB_survey_comparison}.}
 
-\item{type}{Character. \code{"index"} (default), \code{"scatter"} or \code{"spatial"}.}
+\item{type}{Character. \code{"index"} (default), \code{"same_area"}, \code{"scatter"} or
+\code{"spatial"}.}
 
 \item{index_divisor}{Optional numeric divisor applied to index values.}
 
@@ -60,10 +61,12 @@ A \code{ggplot} object (\code{type = "index"}/\code{"scatter"}) or a \code{cowpl
 (\code{type = "spatial"}).
 }
 \description{
-Plots the results of \code{\link[=compare_surveys]{compare_surveys()}} as a time series of indices
-(\code{type = "index"}), a scatter plot of survey vs compiled indices
-(\code{type = "scatter"}), or a spatial prediction-difference map
-(\code{type = "spatial"}, on a \code{\link[ggOceanMaps:basemap]{ggOceanMaps::basemap()}}).
+Plots the results of \code{\link[=compare_surveys]{compare_surveys()}} as a time series of survey
+indices over each survey's own area against the compiled index over the
+whole domain (\code{type = "index"}), survey and compiled indices over the same
+area, one panel per survey (\code{type = "same_area"}), a scatter plot of survey
+vs compiled indices (\code{type = "scatter"}), or a spatial prediction-difference
+map (\code{type = "spatial"}, on a \code{\link[ggOceanMaps:basemap]{ggOceanMaps::basemap()}}).
 }
 \details{
 For \code{type = "spatial"}, each grid cell is compared between a survey's
@@ -117,7 +120,8 @@ sc <- compare_surveys(
   surveys = c("EcoS", "WinterS"), newdata = full_grid, object_crs = 32633,
   mesh_cutoff = 50, offset_col = "swept_area", area = cell_area
 )
-plot(sc)                                              # scaled index time series
+plot(sc)                                              # index time series
+plot(sc, type = "same_area")                          # same-area indices
 plot(sc, type = "scatter", annotate_fit = TRUE)       # survey vs compiled
 plot(sc, type = "spatial", fill_prefix = "Biomass density") # prediction differences
 }
