@@ -15,7 +15,7 @@ compare_models(
   area = 1,
   silent = TRUE,
   n_workers = 1,
-  nsplit = 3,
+  nsplit = NULL,
   future_seed = TRUE
 )
 }
@@ -49,9 +49,12 @@ Default \code{FALSE}.}
 
 \item{n_workers}{Integer. Number of parallel workers. Default \code{1}, which
 uses whatever \code{\link[future:plan]{future::plan()}} is currently set. Values \verb{> 1} set a
-temporary \code{future::multisession} plan.}
+temporary parallel plan (forked \code{future::multicore} where supported,
+otherwise \code{future::multisession}).}
 
-\item{nsplit}{Integer. Number of splits for \code{\link[sdmTMB:get_index_split]{sdmTMB::get_index_split()}}.}
+\item{nsplit}{Integer. Number of splits for \code{\link[sdmTMB:get_index_split]{sdmTMB::get_index_split()}}.
+\code{NULL} (default) uses about 75 000 grid rows per split, which avoids the
+silent crashes of bias-corrected extraction on very large grids.}
 
 \item{future_seed}{Logical or integer. Future-compatible random seed for
 parallel processing. See \code{\link[future.apply:future_lapply]{future.apply::future_lapply()}}.}

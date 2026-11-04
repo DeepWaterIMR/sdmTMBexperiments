@@ -167,7 +167,10 @@ survey_spec <- function(
 #' @param compiled_index A data frame of the compiled reference index, with
 #'   columns `year`, `est`, `lwr`, `upr`, `se`. A time column named after
 #'   `compiled_model$time` (as returned by [sdmTMB::get_index_split()]) is
-#'   renamed to `year`.
+#'   renamed to `year`. It must be in the same units as the survey indices,
+#'   that is, [sdmTMB::get_index_split()] output for `newdata` and `area`
+#'   without rescaling; a warning is given when the two differ by more than
+#'   1000 times.
 #' @param compiled_model A fitted [sdmTMB::sdmTMB()] model for the compiled
 #'   index, or `NULL` (default). When provided, all settings of its original
 #'   call (as with [sdmTMB::update.sdmTMB()]; e.g. family, random fields, time
@@ -223,10 +226,12 @@ survey_spec <- function(
 #'   [sdmTMB::get_index_split()].
 #' @param silent Logical. Suppress model output? Default `TRUE`.
 #' @param nsplit Integer. Number of splits for [sdmTMB::get_index_split()].
-#'   Default `3`.
+#'   `NULL` (default) uses about 75 000 grid rows per split, which avoids the
+#'   silent crashes of bias-corrected extraction on very large grids.
 #' @param n_workers Integer. Number of parallel workers (surveys are processed
 #'   in parallel). Default `1`, which uses whatever [future::plan()] is
-#'   currently set. Values `> 1` set a temporary `future::multisession` plan.
+#'   currently set. Values `> 1` set a temporary parallel plan (forked `future::multicore` where supported,
+#'   otherwise `future::multisession`).
 #' @param future_seed Logical or integer. Future-compatible random seed.
 #' @param concavity Numeric. Default concavity for the survey footprint hulls
 #'   (see [make_survey_prediction_region()]). Default `5`.
@@ -340,7 +345,7 @@ compare_surveys <- function(
   level = 0.95,
   area = 1,
   silent = TRUE,
-  nsplit = 3,
+  nsplit = NULL,
   n_workers = 1,
   future_seed = TRUE,
   concavity = 5,
@@ -490,6 +495,7 @@ compare_surveys <- function(
                        survey = NA_character_, domain = "full")),
     unname(lapply(res, `[[`, "index"))
   ))
+  .check_index_scale(combined_index, reference_label)
   if (!"cv" %in% names(combined_index)) combined_index$cv <- NA_real_
   combined_index$cv <- ifelse(
     is.na(combined_index$cv) & !is.na(combined_index$se),
@@ -509,6 +515,35 @@ compare_surveys <- function(
   attributes(out)$reference_label <- reference_label
   attributes(out)$surveys <- surveys
   out
+}
+
+#' Warn when the compiled index is on a different scale from the survey indices
+#'
+#' A compiled index passed in other units than the survey indices (e.g. kt
+#' while the survey indices from `get_index_split()` are in kg) makes the
+#' reference line vanish from the plots without an error. A difference of more
+#' than three orders of magnitude between the median compiled and median survey
+#' index is far beyond what partial survey domains produce.
+#'
+#' @param index The combined index table.
+#' @param reference_label Label of the compiled index rows.
+#' @keywords internal
+#' @noRd
+.check_index_scale <- function(index, reference_label) {
+  ref <- index$est[index$model == reference_label & index$domain == "full"]
+  srv <- index$est[index$model != reference_label & index$domain == "survey"]
+  ref <- stats::median(ref[is.finite(ref) & ref > 0])
+  srv <- stats::median(srv[is.finite(srv) & srv > 0])
+  if (is.finite(ref) && is.finite(srv) && max(ref / srv, srv / ref) > 1e3) {
+    warning(
+      "The compiled index (median ", signif(ref, 3), ") and the survey indices ",
+      "(median ", signif(srv, 3), ") differ by more than 1000 times. Is ",
+      "`compiled_index` in the same units as sdmTMB::get_index_split() output ",
+      "for `newdata` and `area` (e.g. kg rather than tonnes or kt)?",
+      call. = FALSE
+    )
+  }
+  invisible(NULL)
 }
 
 #' Sanity table from a list of unlisted sanity() results

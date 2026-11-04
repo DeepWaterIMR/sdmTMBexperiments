@@ -44,7 +44,8 @@
 #'   values? Default `TRUE`.
 #' @param n_workers Integer. Number of parallel workers. Default `1`, which
 #'   uses whatever [future::plan()] is currently set. Values `> 1` set a
-#'   temporary `future::multisession` plan.
+#'   temporary parallel plan (forked `future::multicore` where supported,
+#'   otherwise `future::multisession`).
 #' @param future_seed Logical or integer. Future-compatible random seed.
 #' @param verbose Logical. Show progress messages (via \pkg{cli} when
 #'   installed)? Default `TRUE`.
@@ -56,14 +57,26 @@
 #'     (`est` divided by the full index) and `removed` (`TRUE` for years with
 #'     no data left after removing `id`, where `est` is `NA`);
 #'   * `influence`: one row per identifier with the number of rows removed,
-#'     the years it has data in (`id_years`), `influence` (one minus the
-#'     geometric mean ratio over those years, so positive when the identifier
-#'     raises the index), `max_abs_change` and `year_max_change` (the largest
-#'     absolute relative change over all years) and `all_ok` (whether the
-#'     refit passed [sdmTMB::sanity()]).
+#'     the years it has data in (`id_years`), `haul_share` (its share of the
+#'     rows in those years), `influence` (one minus the geometric mean ratio
+#'     over those years, so positive when the identifier raises the index),
+#'     `leverage` (`influence / haul_share`), `max_abs_change` and
+#'     `year_max_change` (the largest absolute relative change over all years)
+#'     and `all_ok` (whether the refit passed [sdmTMB::sanity()]).
+#'
+#' @section Influence and leverage:
+#' A large `influence` on its own mostly flags the main survey of a year: if a
+#' cruise supplied 60 % of a year's hauls, removing it is expected to move the
+#' index. `leverage` scales the influence by the identifier's share of the
+#' hauls, so a value well above 1 marks an identifier that moves the index far
+#' more than its sample size warrants, typically a one-off or auxiliary cruise
+#' that sampled a high-density area few other cruises cover. A practical screen
+#' is `influence >= 0.1 & leverage >= 2`; see `plot(x, type = "leverage")`.
+#' Screen candidates cheaply first with [density_share()].
 #'
 #' @author Mikko Vihtakari
-#' @seealso [compare_surveys()], [sdmTMB_retro()], [plot.sdmTMB_leave_out()]
+#' @seealso [density_share()], [sdmTMB_data_scenarios()], [compare_surveys()],
+#'   [sdmTMB_retro()], [plot.sdmTMB_leave_out()]
 #' @importFrom rlang .data
 #' @examples
 #' \donttest{
@@ -96,7 +109,7 @@ sdmTMB_leave_out <- function(
   newdata,
   area = 1,
   index = c("plugin", "split"),
-  nsplit = 3,
+  nsplit = NULL,
   bias_correct = FALSE,
   level = 0.95,
   warm_start = TRUE,
@@ -123,19 +136,8 @@ sdmTMB_leave_out <- function(
   if (is.character(cell_area)) cell_area <- newdata[[cell_area]]
 
   fit_index <- function(mod) {
-    if (index == "plugin") {
-      p <- suppressMessages(stats::predict(mod, newdata = newdata, type = "response"))
-      tibble::tibble(year = p[[time_col]], est = p$est * cell_area) |>
-        dplyr::summarise(est = sum(.data$est), .by = "year")
-    } else {
-      idx <- .safe_index(
-        mod = mod, newdata = newdata, time_col = time_col, nsplit = nsplit,
-        bias_correct = bias_correct, level = level, area = cell_area,
-        silent = TRUE
-      )
-      names(idx)[names(idx) == time_col] <- "year"
-      tibble::as_tibble(idx[c("year", "est", "lwr", "upr", "se")])
-    }
+    .grid_index(mod, newdata, cell_area, time_col, index = index,
+                nsplit = nsplit, bias_correct = bias_correct, level = level)
   }
 
   start_pars <- if (warm_start) sdmTMB::get_pars(object) else NULL
@@ -144,17 +146,8 @@ sdmTMB_leave_out <- function(
   refit_args <- .refit_args(object)
 
   refit <- function(keep, start) {
-    # Drop factor levels that only the removed rows had
-    x <- droplevels(dat[keep, , drop = FALSE])
-    args <- refit_args
-    args$control$start <- start
-    # Years left without data stay in the model as extra time steps, so the
-    # random fields (and the warm start) keep their dimensions
-    extra <- sort(unique(c(args$extra_time, setdiff(data_years, x[[time_col]]))))
-    args["extra_time"] <- list(if (length(extra) > 0) extra else NULL)
-    mesh <- sdmTMB::make_mesh(x, xy_cols = object$spde$xy_cols, mesh = object$spde$mesh)
-    mesh <- .copy_barrier(mesh, object$spde)
-    suppressMessages(.refit(args, data = x, mesh = mesh, rows = keep, silent = TRUE))
+    .refit_on_mesh(object, dat[keep, , drop = FALSE], keep, refit_args, start,
+                   data_years)
   }
 
   use_cli <- isTRUE(verbose) && requireNamespace("cli", quietly = TRUE)
@@ -208,6 +201,7 @@ sdmTMB_leave_out <- function(
       dplyr::select(-"est_full")
   }
 
+  rows_by_year <- table(dat[[time_col]])
   id_info <- tibble::tibble(id = as.character(dat[[id_col]]), year = dat[[time_col]]) |>
     dplyr::filter(.data$id %in% ids) |>
     dplyr::summarise(
@@ -215,6 +209,13 @@ sdmTMB_leave_out <- function(
       id_years = list(sort(unique(.data$year))),
       .by = "id"
     )
+  # Share of the rows (hauls) of the identifier's years that the identifier
+  # supplied: the influence expected if every haul counted equally
+  id_info$haul_share <- id_info$n_removed / vapply(
+    id_info$id_years,
+    function(y) sum(rows_by_year[as.character(y)]),
+    numeric(1)
+  )
 
   influence <- id_info |>
     dplyr::left_join(
@@ -244,7 +245,9 @@ sdmTMB_leave_out <- function(
     influence$max_abs_change <- NA_real_
     influence$year_max_change <- NA
   }
+  influence$leverage <- influence$influence / influence$haul_share
   influence <- influence |>
+    dplyr::relocate("leverage", .after = "influence") |>
     dplyr::relocate("all_ok", .after = dplyr::last_col()) |>
     dplyr::arrange(dplyr::desc(.data$influence))
 
@@ -260,12 +263,16 @@ sdmTMB_leave_out <- function(
 #'
 #' @description
 #' Plots the results of [sdmTMB_leave_out()]: the full index together with the
-#' index from each leave-out refit (`type = "index"`), or the ratio of each
-#' leave-out index to the full index (`type = "ratio"`). Years without data
-#' after removing an identifier are gaps.
+#' index from each leave-out refit (`type = "index"`), the ratio of each
+#' leave-out index to the full index (`type = "ratio"`), or influence against
+#' haul share (`type = "leverage"`), where identifiers above the
+#' `leverage_limit` line and the `influence_limit` line are labelled. Years
+#' without data after removing an identifier are gaps.
 #'
 #' @param x An object of class `sdmTMB_leave_out`.
-#' @param type Character. `"index"` (default) or `"ratio"`.
+#' @param type Character. `"index"` (default), `"ratio"` or `"leverage"`.
+#' @param influence_limit,leverage_limit Numeric. Flag limits for
+#'   `type = "leverage"`. Defaults `0.1` and `2`.
 #' @param ids Optional subset of identifiers to plot. Defaults to all; for many
 #'   identifiers (e.g. hauls), pass the most influential ones.
 #' @param index_divisor Optional numeric divisor applied to index values.
@@ -296,6 +303,7 @@ sdmTMB_leave_out <- function(
 #' lo <- sdmTMB_leave_out(fit, id_col = "cruiseseries", newdata = grid)
 #' plot(lo)
 #' plot(lo, type = "ratio")
+#' plot(lo, type = "leverage")
 #' }
 #' @method plot sdmTMB_leave_out
 #' @export
@@ -306,9 +314,42 @@ plot.sdmTMB_leave_out <- function(
   index_divisor = NULL,
   unit = NA,
   base_size = 11,
+  influence_limit = 0.1,
+  leverage_limit = 2,
   ...
 ) {
-  type <- match.arg(type, c("index", "ratio"))
+  type <- match.arg(type, c("index", "ratio", "leverage"))
+  if (type == "leverage") {
+    inf <- x$influence
+    if (!is.null(ids)) inf <- dplyr::filter(inf, .data$id %in% ids)
+    inf <- dplyr::filter(inf, is.finite(.data$influence))
+    if (nrow(inf) == 0) stop("No influence values to plot.")
+    inf$flagged <- inf$influence >= influence_limit &
+      inf$leverage >= leverage_limit
+    share_max <- max(inf$haul_share, na.rm = TRUE)
+    return(
+      ggplot2::ggplot(inf, ggplot2::aes(x = .data$haul_share, y = .data$influence)) +
+        ggplot2::geom_hline(yintercept = c(0, influence_limit),
+                            linetype = c(1, 2), color = "grey60") +
+        ggplot2::geom_abline(slope = c(1, leverage_limit), intercept = 0,
+                             linetype = c(3, 2), color = "grey60") +
+        ggplot2::geom_point(ggplot2::aes(color = .data$flagged)) +
+        ggplot2::geom_text(
+          data = inf[inf$flagged, , drop = FALSE],
+          ggplot2::aes(label = .data$id), size = base_size / 4,
+          hjust = -0.1, vjust = 0.5, check_overlap = TRUE
+        ) +
+        ggplot2::scale_color_manual(
+          values = c(`FALSE` = "grey40", `TRUE` = "#E41A1C"), guide = "none"
+        ) +
+        ggplot2::coord_cartesian(xlim = c(0, share_max * 1.15)) +
+        ggplot2::labs(
+          x = paste("Share of the year's hauls,", attr(x, "id_col")),
+          y = "Influence (1 - leave-out / full)"
+        ) +
+        ggplot2::theme_classic(base_size = base_size)
+    )
+  }
   idx <- x$index
   if (!is.null(ids)) idx <- dplyr::filter(idx, .data$id %in% ids)
   if (nrow(idx) == 0) stop("No leave-out indices to plot.")

@@ -726,7 +726,7 @@ plot.sdmTMB_selection <- function(
   bias_correct = FALSE,
   level = 0.95,
   area = 1,
-  nsplit = 3,
+  nsplit = NULL,
   silent = TRUE,
   base_size = 11,
   ...

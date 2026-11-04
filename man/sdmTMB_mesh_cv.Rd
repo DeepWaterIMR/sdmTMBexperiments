@@ -49,7 +49,8 @@ inherited from \code{object}.}
 
 \item{n_workers}{Integer. Number of parallel workers. Default \code{1}, which
 uses whatever \code{\link[future:plan]{future::plan()}} is currently set. Values \verb{> 1} set a
-temporary \code{future::multisession} plan.}
+temporary parallel plan (forked \code{future::multicore} where supported,
+otherwise \code{future::multisession}).}
 
 \item{future_seed}{Logical or integer. Future-compatible random seed.}
 

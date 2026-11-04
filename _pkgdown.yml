@@ -23,11 +23,19 @@ reference:
   contents:
   - sdmTMB_retro
   - mohns_rho
-- title: Survey comparison and prediction grids
+- title: Survey comparison
   contents:
   - compare_surveys
   - survey_spec
+- title: Influence and data-filter scenarios
+  contents:
   - sdmTMB_leave_out
+  - density_share
+  - sdmTMB_data_scenarios
+  - peak_ratio
+  - index_by_region
+- title: Prediction grids
+  contents:
   - make_survey_prediction_region
   - make_prediction_grid
 - title: Plotting

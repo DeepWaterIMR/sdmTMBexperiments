@@ -38,7 +38,8 @@
 #'   inherited from `object`.
 #' @param n_workers Integer. Number of parallel workers. Default `1`, which
 #'   uses whatever [future::plan()] is currently set. Values `> 1` set a
-#'   temporary `future::multisession` plan.
+#'   temporary parallel plan (forked `future::multicore` where supported,
+#'   otherwise `future::multisession`).
 #' @param future_seed Logical or integer. Future-compatible random seed.
 #' @param silent Logical. Suppress fitting output? Default `TRUE`.
 #'

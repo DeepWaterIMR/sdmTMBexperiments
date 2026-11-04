@@ -25,7 +25,7 @@ compare_surveys(
   level = 0.95,
   area = 1,
   silent = TRUE,
-  nsplit = 3,
+  nsplit = NULL,
   n_workers = 1,
   future_seed = TRUE,
   concavity = 5,
@@ -48,7 +48,10 @@ identifying the survey series (see \code{survey_col}) and coordinate columns
 \item{compiled_index}{A data frame of the compiled reference index, with
 columns \code{year}, \code{est}, \code{lwr}, \code{upr}, \code{se}. A time column named after
 \code{compiled_model$time} (as returned by \code{\link[sdmTMB:get_index_split]{sdmTMB::get_index_split()}}) is
-renamed to \code{year}.}
+renamed to \code{year}. It must be in the same units as the survey indices,
+that is, \code{\link[sdmTMB:get_index_split]{sdmTMB::get_index_split()}} output for \code{newdata} and \code{area}
+without rescaling; a warning is given when the two differ by more than
+1000 times.}
 
 \item{compiled_model}{A fitted \code{\link[sdmTMB:sdmTMB]{sdmTMB::sdmTMB()}} model for the compiled
 index, or \code{NULL} (default). When provided, all settings of its original
@@ -124,11 +127,13 @@ name in \code{newdata}, or a numeric vector with one value per row of
 \item{silent}{Logical. Suppress model output? Default \code{TRUE}.}
 
 \item{nsplit}{Integer. Number of splits for \code{\link[sdmTMB:get_index_split]{sdmTMB::get_index_split()}}.
-Default \code{3}.}
+\code{NULL} (default) uses about 75 000 grid rows per split, which avoids the
+silent crashes of bias-corrected extraction on very large grids.}
 
 \item{n_workers}{Integer. Number of parallel workers (surveys are processed
 in parallel). Default \code{1}, which uses whatever \code{\link[future:plan]{future::plan()}} is
-currently set. Values \verb{> 1} set a temporary \code{future::multisession} plan.}
+currently set. Values \verb{> 1} set a temporary parallel plan (forked \code{future::multicore} where supported,
+otherwise \code{future::multisession}).}
 
 \item{future_seed}{Logical or integer. Future-compatible random seed.}
 

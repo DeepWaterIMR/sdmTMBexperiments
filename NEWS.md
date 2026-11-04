@@ -1,3 +1,21 @@
+# sdmTMBexperiments 0.1.9
+
+2026-11-04 Influence screens, data-filter scenarios, regional index split, forked parallel workers and automatic `nsplit`.
+
+## New features
+
+* `density_share()` is a model-free screen of each haul's (or cruise's) share of the year's summed density, with its share of the year's hauls and an optional candidate screen (`top_n`, `min_share`) for `sdmTMB_leave_out()`.
+* `sdmTMB_leave_out()` returns `haul_share` and `leverage` (`influence / haul_share`) per identifier, and `plot(type = "leverage")` labels identifiers with `influence >= 0.1` and `leverage >= 2`. Raw influence mostly flags the main survey of a year; leverage separates identifiers that move the index far more than their sample size warrants.
+* New `sdmTMB_data_scenarios()` (+ `plot()`) refits a model under named data filters (rows dropped or values modified) or alternative prediction grids, on the same mesh with warm starts, to compare general filtering rules with named exclusions.
+* New `peak_ratio()` measures an index value against its neighbouring years, for scenario, leave-out or plain index tables.
+* New `index_by_region()` (+ `plot()`) splits the plug-in index by a region column of the grid, with each region's share and its ratio to its own mean.
+
+## Changes
+
+* `n_workers > 1` now uses forked `future::multicore` workers where supported (macOS/Linux outside RStudio) and `multisession` otherwise. Forked workers survive an SSH logout in a detached `screen`/`tmux` session; `multisession` workers can be killed by systemd.
+* `nsplit` defaults to `NULL` everywhere: about 75 000 grid rows per split. Bias-corrected extraction on chunks of several hundred thousand rows can crash the R session without an R error.
+* `compare_surveys()` warns when `compiled_index` and the survey indices differ by more than 1000 times, the symptom of a compiled index passed in other units (e.g. kt instead of kg).
+
 # sdmTMBexperiments 0.1.8
 
 2026-11-03 Survey-specific settings, the same-area comparison and leave-one-out refits for survey comparisons.

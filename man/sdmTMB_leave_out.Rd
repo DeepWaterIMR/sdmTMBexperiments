@@ -11,7 +11,7 @@ sdmTMB_leave_out(
   newdata,
   area = 1,
   index = c("plugin", "split"),
-  nsplit = 3,
+  nsplit = NULL,
   bias_correct = FALSE,
   level = 0.95,
   warm_start = TRUE,
@@ -50,7 +50,8 @@ values? Default \code{TRUE}.}
 
 \item{n_workers}{Integer. Number of parallel workers. Default \code{1}, which
 uses whatever \code{\link[future:plan]{future::plan()}} is currently set. Values \verb{> 1} set a
-temporary \code{future::multisession} plan.}
+temporary parallel plan (forked \code{future::multicore} where supported,
+otherwise \code{future::multisession}).}
 
 \item{future_seed}{Logical or integer. Future-compatible random seed.}
 
@@ -66,11 +67,12 @@ An object of class \code{sdmTMB_leave_out}, a list with
 (\code{est} divided by the full index) and \code{removed} (\code{TRUE} for years with
 no data left after removing \code{id}, where \code{est} is \code{NA});
 \item \code{influence}: one row per identifier with the number of rows removed,
-the years it has data in (\code{id_years}), \code{influence} (one minus the
-geometric mean ratio over those years, so positive when the identifier
-raises the index), \code{max_abs_change} and \code{year_max_change} (the largest
-absolute relative change over all years) and \code{all_ok} (whether the
-refit passed \code{\link[sdmTMB:sanity]{sdmTMB::sanity()}}).
+the years it has data in (\code{id_years}), \code{haul_share} (its share of the
+rows in those years), \code{influence} (one minus the geometric mean ratio
+over those years, so positive when the identifier raises the index),
+\code{leverage} (\code{influence / haul_share}), \code{max_abs_change} and
+\code{year_max_change} (the largest absolute relative change over all years)
+and \code{all_ok} (whether the refit passed \code{\link[sdmTMB:sanity]{sdmTMB::sanity()}}).
 }
 }
 \description{
@@ -96,6 +98,18 @@ those refits to fail. Likewise, if \code{newdata} predicts for a level of a
 factor in the formula (e.g. \code{cruiseseries = "SeriesA"}), that level cannot
 be left out.
 }
+\section{Influence and leverage}{
+
+A large \code{influence} on its own mostly flags the main survey of a year: if a
+cruise supplied 60 \% of a year's hauls, removing it is expected to move the
+index. \code{leverage} scales the influence by the identifier's share of the
+hauls, so a value well above 1 marks an identifier that moves the index far
+more than its sample size warrants, typically a one-off or auxiliary cruise
+that sampled a high-density area few other cruises cover. A practical screen
+is \code{influence >= 0.1 & leverage >= 2}; see \code{plot(x, type = "leverage")}.
+Screen candidates cheaply first with \code{\link[=density_share]{density_share()}}.
+}
+
 \examples{
 \donttest{
 data(sebastes)
@@ -121,7 +135,8 @@ plot(lo, type = "ratio")
 }
 }
 \seealso{
-\code{\link[=compare_surveys]{compare_surveys()}}, \code{\link[=sdmTMB_retro]{sdmTMB_retro()}}, \code{\link[=plot.sdmTMB_leave_out]{plot.sdmTMB_leave_out()}}
+\code{\link[=density_share]{density_share()}}, \code{\link[=sdmTMB_data_scenarios]{sdmTMB_data_scenarios()}}, \code{\link[=compare_surveys]{compare_surveys()}},
+\code{\link[=sdmTMB_retro]{sdmTMB_retro()}}, \code{\link[=plot.sdmTMB_leave_out]{plot.sdmTMB_leave_out()}}
 }
 \author{
 Mikko Vihtakari

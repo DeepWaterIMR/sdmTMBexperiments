@@ -10,11 +10,14 @@
 #' caller can restore them with `on.exit(.restore_parallel(old))`.
 #'
 #' The user's own [future::plan()] is respected and left untouched when
-#' `n_workers = 1`. Only when the user explicitly asks for `n_workers > 1` is a
-#' portable `multisession` plan installed (works on all platforms, including
-#' Windows) for the duration of the call. Users who want forked (`multicore`)
-#' or cluster workers can set their own plan before calling and keep
-#' `n_workers = 1`.
+#' `n_workers = 1`. When the user asks for `n_workers > 1`, a forked
+#' `multicore` plan is installed for the duration of the call where forking is
+#' supported ([future::supportsMulticore()]: macOS/Linux outside RStudio), and a
+#' `multisession` plan otherwise (Windows, RStudio). Forked workers share the
+#' parent's process group, so they survive an SSH logout when the job runs in
+#' a detached `screen`/`tmux` session; `multisession` workers are separate
+#' processes that systemd can kill on logout. Users who want cluster workers can
+#' set their own plan before calling and keep `n_workers = 1`.
 #'
 #' @param n_workers Integer number of workers.
 #' @return A list with the previous future plan and option value.
@@ -26,7 +29,11 @@
     max_size = getOption("future.globals.maxSize")
   )
   if (n_workers > 1) {
-    future::plan(future::multisession, workers = n_workers)
+    if (future::supportsMulticore()) {
+      future::plan(future::multicore, workers = n_workers)
+    } else {
+      future::plan(future::multisession, workers = n_workers)
+    }
   }
   .set_future_memory()
   old
@@ -319,6 +326,80 @@
   invisible(NULL)
 }
 
+#' Choose the number of splits for sdmTMB::get_index_split()
+#'
+#' Bias-corrected index extraction on very large prediction grids can crash at
+#' the C++ level with no R error (the R session simply ends, which a Quarto or
+#' knitr render reports as a stopped process). Chunks of about 75 000 grid rows
+#' have proved reliable; chunks of about 450 000 rows have not.
+#'
+#' @param n Number of rows in the prediction grid.
+#' @param rows_per_split Target number of grid rows per split.
+#' @return An integer number of splits, at least 1.
+#' @keywords internal
+#' @noRd
+.auto_nsplit <- function(n, rows_per_split = 75e3) {
+  max(1L, as.integer(ceiling(n / rows_per_split)))
+}
+
+#' Plug-in or split index of one model over a prediction grid
+#'
+#' `"plugin"` sums the response-scale grid predictions times `area` (fast, no
+#' uncertainty); `"split"` uses `.safe_index()` and returns `lwr`, `upr`, `se`.
+#'
+#' @param mod A fitted sdmTMB model.
+#' @param newdata Prediction grid.
+#' @param area Cell area: a scalar or a vector with one value per grid row.
+#' @param time_col Name of the time column.
+#' @param index `"plugin"` or `"split"`.
+#' @param nsplit,bias_correct,level Passed to `.safe_index()`.
+#' @return A tibble with `year`, `est` (and `lwr`, `upr`, `se` for `"split"`).
+#' @keywords internal
+#' @noRd
+.grid_index <- function(mod, newdata, area, time_col, index = "plugin",
+                        nsplit = NULL, bias_correct = FALSE, level = 0.95) {
+  if (index == "plugin") {
+    p <- suppressMessages(stats::predict(mod, newdata = newdata, type = "response"))
+    tibble::tibble(year = p[[time_col]], est = p$est * area) |>
+      dplyr::summarise(est = sum(.data$est), .by = "year")
+  } else {
+    idx <- .safe_index(
+      mod = mod, newdata = newdata, time_col = time_col, nsplit = nsplit,
+      bias_correct = bias_correct, level = level, area = area, silent = TRUE
+    )
+    tibble::as_tibble(idx[c("year", "est", "lwr", "upr", "se")])
+  }
+}
+
+#' Refit a model to modified or subset data on the original mesh
+#'
+#' Used by `sdmTMB_leave_out()` and `sdmTMB_data_scenarios()`. The original
+#' mesh triangulation is reused (so only the data change), years left without
+#' data are kept as `extra_time` so random fields and warm starts keep their
+#' dimensions, and factor levels that only the removed rows had are dropped.
+#'
+#' @param object The original fitted sdmTMB model.
+#' @param data The data to refit to (rows of `object$data`, possibly with
+#'   modified values).
+#' @param rows Logical index of the rows of `object$data` kept in `data`.
+#' @param refit_args A list from `.refit_args()`.
+#' @param start Starting values or `NULL`.
+#' @param data_years Years in the original data.
+#' @return A fitted sdmTMB model.
+#' @keywords internal
+#' @noRd
+.refit_on_mesh <- function(object, data, rows, refit_args, start, data_years) {
+  time_col <- object$time
+  x <- droplevels(data)
+  args <- refit_args
+  args$control$start <- start
+  extra <- sort(unique(c(args$extra_time, setdiff(data_years, x[[time_col]]))))
+  args["extra_time"] <- list(if (length(extra) > 0) extra else NULL)
+  mesh <- sdmTMB::make_mesh(x, xy_cols = object$spde$xy_cols, mesh = object$spde$mesh)
+  mesh <- .copy_barrier(mesh, object$spde)
+  suppressMessages(.refit(args, data = x, mesh = mesh, rows = rows, silent = TRUE))
+}
+
 #' Safely calculate a split survey index for one model
 #'
 #' Wraps [sdmTMB::get_index_split()] with a graceful fallback for models that
@@ -338,7 +419,8 @@
 #' @param newdata Prediction grid data frame.
 #' @param time_col Name of the time column (used for the crashed fallback).
 #' @param nsplit,bias_correct,level,area,silent,predict_args Passed to
-#'   [sdmTMB::get_index_split()].
+#'   [sdmTMB::get_index_split()]. `nsplit = NULL` chooses the number of splits
+#'   from the grid size (`.auto_nsplit()`).
 #' @param label Optional model name, used in the warning when extraction fails.
 #' @return A data frame with the index and a `cv` column. The time column is
 #'   always named `year`, whatever the model's time column is called, so that
@@ -360,6 +442,7 @@
   if (is.null(mod) || inherits(mod, "try-error")) {
     return(.crashed_index(unique(newdata[[time_col]])))
   }
+  if (is.null(nsplit)) nsplit <- .auto_nsplit(nrow(newdata))
   idx <- try(
     suppressMessages(
       sdmTMB::get_index_split(

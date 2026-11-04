@@ -128,6 +128,18 @@ survey its own series (several can be combined), model settings, depth band
 and grid. `sdmTMB_leave_out()` refits the compiled model without each survey
 series to show which series carries the signal.
 
+### Influence of hauls and cruises, and data-filter scenarios
+
+To diagnose an anomalous index year: `index_by_region()` shows which part of
+the grid carries it; `density_share()` screens hauls or cruises cheaply;
+`sdmTMB_leave_out()` refits without each candidate and reports `influence`
+and `leverage` (influence / share of the year's hauls; flag `influence >= 0.1`
+and `leverage >= 2`); `sdmTMB_data_scenarios()` refits under general filtering
+rules and named exclusions, and `peak_ratio()` compares them. Prefer a general
+rule; a named exclusion is defensible only when no general rule removes the
+anomaly without distorting other years. Build cruise identifiers from platform
+and cruise number together; cruise numbers are reused across vessels.
+
 ```r
 data(sebastes)
 region <- make_survey_prediction_region(subset(sebastes, cruiseseries == "EggaN"),

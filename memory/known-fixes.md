@@ -186,5 +186,15 @@ examples/vignettes or from user review. Each is also noted in `NEWS.md`.
     model already got.
 
 ## Portability change
-The source repo used `future::multicore`; the package uses the portable
-`future::multisession` so it works on Windows and in R CMD check.
+The source repo used `future::multicore`; the package first switched to the
+portable `future::multisession`. Since 0.1.9 `.setup_parallel()` uses
+`multicore` where `future::supportsMulticore()` is `TRUE` and `multisession`
+otherwise: unattended renders in a detached `screen` session lost all
+`multisession` workers when the user logged out of SSH (systemd kills them;
+forked workers share the screen's process group).
+
+## Silent bias-correction crash (0.1.9)
+`get_index_split(bias_correct = TRUE)` on a ~910 000-row grid with `nsplit = 2`
+ended the R session with no R error; `nsplit = 12` (~76 000 rows per split)
+was reliable. `nsplit = NULL` (`.auto_nsplit()`, 75 000 rows per split) is now
+the default everywhere.

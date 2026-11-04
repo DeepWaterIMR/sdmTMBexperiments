@@ -11,13 +11,15 @@
   index_divisor = NULL,
   unit = NA,
   base_size = 11,
+  influence_limit = 0.1,
+  leverage_limit = 2,
   ...
 )
 }
 \arguments{
 \item{x}{An object of class \code{sdmTMB_leave_out}.}
 
-\item{type}{Character. \code{"index"} (default) or \code{"ratio"}.}
+\item{type}{Character. \code{"index"} (default), \code{"ratio"} or \code{"leverage"}.}
 
 \item{ids}{Optional subset of identifiers to plot. Defaults to all; for many
 identifiers (e.g. hauls), pass the most influential ones.}
@@ -28,6 +30,9 @@ identifiers (e.g. hauls), pass the most influential ones.}
 
 \item{base_size}{Numeric. Base font size. Default \code{11}.}
 
+\item{influence_limit, leverage_limit}{Numeric. Flag limits for
+\code{type = "leverage"}. Defaults \code{0.1} and \code{2}.}
+
 \item{...}{Currently ignored.}
 }
 \value{
@@ -35,9 +40,11 @@ A \code{ggplot} object.
 }
 \description{
 Plots the results of \code{\link[=sdmTMB_leave_out]{sdmTMB_leave_out()}}: the full index together with the
-index from each leave-out refit (\code{type = "index"}), or the ratio of each
-leave-out index to the full index (\code{type = "ratio"}). Years without data
-after removing an identifier are gaps.
+index from each leave-out refit (\code{type = "index"}), the ratio of each
+leave-out index to the full index (\code{type = "ratio"}), or influence against
+haul share (\code{type = "leverage"}), where identifiers above the
+\code{leverage_limit} line and the \code{influence_limit} line are labelled. Years
+without data after removing an identifier are gaps.
 }
 \examples{
 \donttest{
@@ -56,6 +63,7 @@ grid <- sdmTMB::replicate_df(
 lo <- sdmTMB_leave_out(fit, id_col = "cruiseseries", newdata = grid)
 plot(lo)
 plot(lo, type = "ratio")
+plot(lo, type = "leverage")
 }
 }
 \seealso{

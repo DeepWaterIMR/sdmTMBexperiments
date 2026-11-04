@@ -37,9 +37,11 @@
 #' @param silent Logical. Suppress model fitting output?
 #' @param n_workers Integer. Number of parallel workers. Default `1`, which
 #'   uses whatever [future::plan()] is currently set (sequential by default).
-#'   Values `> 1` set a temporary `future::multisession` plan with that many
-#'   workers.
+#'   Values `> 1` set a temporary parallel plan (forked `future::multicore` where supported,
+#'   otherwise `future::multisession`).
 #' @param nsplit Integer. Number of splits for [sdmTMB::get_index_split()].
+#'   `NULL` (default) uses about 75 000 grid rows per split, which avoids the
+#'   silent crashes of bias-corrected extraction on very large grids.
 #' @param predict_args A list of extra arguments passed to
 #'   [sdmTMB::predict.sdmTMB()] when calculating each peel's index (the
 #'   `predict_args` argument of [sdmTMB::get_index_split()]), e.g.
@@ -81,7 +83,7 @@ sdmTMB_retro <- function(
   save_models = FALSE,
   silent = TRUE,
   n_workers = 1,
-  nsplit = 3,
+  nsplit = NULL,
   predict_args = list(),
   future_seed = TRUE
 ) {
