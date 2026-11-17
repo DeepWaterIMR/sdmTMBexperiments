@@ -45,6 +45,8 @@ reference:
   - plot_random_field
   - plot_index
   - plot_fixed_effects
+  - conditional_effects
+  - effects_reference_text
   - plot_variance_partitioning
   - plot_prediction_histogram
   - plot_residual_qq

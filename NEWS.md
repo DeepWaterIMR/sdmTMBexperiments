@@ -1,3 +1,12 @@
+# sdmTMBexperiments 0.1.10
+
+2026-11-17 Conditional-effects figure for sdmTMB fits.
+
+## New features
+
+* New `conditional_effects()` (+ `plot()`, `print()`) predicts the response of one or several sdmTMB models along each fixed-effect term, with the other terms at reference values, in a single `predict(..., re_form = NA, se_fit = TRUE, model = NA, offset = 0)` call per model (delta and non-delta families). Terms are detected from the formula: smooths and linear numeric terms are curves with a rug of positive observations, factors (including `as.factor(year)`) are point ranges, each in its own panel, aligned across models. The depth reference is the peak of the depth effect (`peak`); factors default to the most common level, a factor of the time variable to the last year, discrete numerics such as month to the most sampled value. References and term labels can be set by the user. The `se_fit` sdreport can take several minutes on large models.
+* New `effects_reference_text()` writes the reference of every term for a figure caption.
+
 # sdmTMBexperiments 0.1.9
 
 2026-11-04 Influence screens, data-filter scenarios, regional index split, forked parallel workers and automatic `nsplit`.
