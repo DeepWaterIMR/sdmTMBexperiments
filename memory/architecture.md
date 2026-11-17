@@ -17,6 +17,9 @@
   `.selection_table()`, `.selection_slug()`, `.selection_status()`,
   `.all_sane()`, `.min_or_na()`, `.modal()`, `.is_true()`
 - `R/plot.R` — diagnostic/result plotting helpers
+- `R/conditional-effects.R` — `conditional_effects()` + `print`/`plot` methods and
+  `effects_reference_text()`: response-scale effect of each fixed-effect term with
+  the others at references (peak term first), one `se_fit` predict per model
 - `R/bubble-map.R` — `bubble_map()`
 - `R/utils.R` — internal shared helpers
 - `R/data-docs.R` — `sebastes` dataset docs
@@ -70,8 +73,9 @@
 
 ## S3 classes
 `sdmTMB_model_comparison`, `sdmTMB_mesh_comparison`, `sdmTMB_survey_comparison`,
-`sdmTMB_retro`, `sdmTMB_mesh_cv`, `sdmTMB_selection`, `sdmTMB_leave_out` — each with a `plot()`
-method (`sdmTMB_selection` also has `print()`).
+`sdmTMB_retro`, `sdmTMB_mesh_cv`, `sdmTMB_selection`, `sdmTMB_leave_out`,
+`sdmTMB_conditional_effects` — each with a `plot()` method (`sdmTMB_selection` and
+`sdmTMB_conditional_effects` also have `print()`).
 
 ## The model-selection contract (`R/model-selection.R`)
 The design decisions behind the selection table, all of them fixes for ways a

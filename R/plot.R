@@ -455,9 +455,9 @@ plot_index <- function(index, facet = TRUE, index_unit = NA, base_size = 11) {
 #'
 #' @description
 #' A tidy coefficient plot of the fixed-effect estimates and confidence
-#' intervals from [sdmTMB::tidy()]. This is the generic equivalent of a
-#' conditional-effects figure: it summarises the fitted parameters rather than
-#' predicting over covariate ranges.
+#' intervals from [sdmTMB::tidy()], on the link scale. It summarises the fitted
+#' parameters rather than predicting over covariate ranges; for the predicted
+#' response along each term (smooths included), use [conditional_effects()].
 #'
 #' @param fit A fitted [sdmTMB::sdmTMB()] model.
 #' @param base_size Numeric. Base font size. Default `11`.
@@ -465,7 +465,7 @@ plot_index <- function(index, facet = TRUE, index_unit = NA, base_size = 11) {
 #' @return A `ggplot` object.
 #'
 #' @author Mikko Vihtakari
-#' @seealso [sdmTMB::tidy()]
+#' @seealso [sdmTMB::tidy()], [conditional_effects()]
 #' @import ggplot2
 #' @importFrom rlang .data
 #' @examples

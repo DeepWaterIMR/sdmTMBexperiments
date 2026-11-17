@@ -87,6 +87,8 @@ is `future_seed` everywhere. See [memory/naming-conventions.md](memory/naming-co
 - Plotting helpers ([R/plot.R](R/plot.R)): `plot_mesh()`,
   `plot_prediction_map()`, `plot_random_field()`, `plot_index()`,
   `plot_fixed_effects()`, `plot_variance_partitioning()`,
+  `conditional_effects()` (+ `plot`, `effects_reference_text()`; in
+  [R/conditional-effects.R](R/conditional-effects.R)),
   `plot_prediction_histogram()`, `plot_residual_qq()`; plus `bubble_map()`.
 
 ### Dependency policy

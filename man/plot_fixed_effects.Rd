@@ -16,9 +16,9 @@ A \code{ggplot} object.
 }
 \description{
 A tidy coefficient plot of the fixed-effect estimates and confidence
-intervals from \code{\link[sdmTMB:tidy]{sdmTMB::tidy()}}. This is the generic equivalent of a
-conditional-effects figure: it summarises the fitted parameters rather than
-predicting over covariate ranges.
+intervals from \code{\link[sdmTMB:tidy]{sdmTMB::tidy()}}, on the link scale. It summarises the fitted
+parameters rather than predicting over covariate ranges; for the predicted
+response along each term (smooths included), use \code{\link[=conditional_effects]{conditional_effects()}}.
 }
 \examples{
 \donttest{
@@ -31,7 +31,7 @@ plot_fixed_effects(m)
 }
 }
 \seealso{
-\code{\link[sdmTMB:tidy]{sdmTMB::tidy()}}
+\code{\link[sdmTMB:tidy]{sdmTMB::tidy()}}, \code{\link[=conditional_effects]{conditional_effects()}}
 }
 \author{
 Mikko Vihtakari

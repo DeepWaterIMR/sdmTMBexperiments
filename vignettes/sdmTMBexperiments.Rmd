@@ -106,6 +106,24 @@ plot_residual_qq(m3)
 plot_variance_partitioning(m3)
 ```
 
+### Conditional effects
+
+`plot_fixed_effects()` shows the coefficients on the link scale. `conditional_effects()` instead predicts the response along each fixed-effect term with the other terms held at reference values, without the random fields, so smooths and factors are on one interpretable scale. Each term gets its own panel; the depth reference is the depth where the predicted response peaks, and the other references (most common factor level, last year) are stated by `effects_reference_text()`. Confidence intervals need one `se_fit` sdreport per model, which can take several minutes on large models, so save the result in reports that are re-rendered.
+
+```{r conditional-effects}
+m4 <- sdmTMB(
+  density ~ s(depth, k = 5) + as.factor(year),
+  data = pcod,
+  time = "year",
+  mesh = mesh,
+  family = delta_lognormal()
+)
+
+eff <- conditional_effects(m4, labels = c(depth = "Depth (m)"))
+plot(eff, fit = m4, y_lab = "Density (kg/km^2)")
+effects_reference_text(eff)
+```
+
 ## Mesh-resolution sensitivity
 
 Mesh resolution can affect model results. `compare_meshes()` fits a model at multiple mesh resolutions and compares the resulting indices and spatial predictions. The example below compares two meshes with cutoffs of 10 and 30 km, using the 20 km mesh as the reference, and shows how finer mesh size leads to generally lower index estimates. 
