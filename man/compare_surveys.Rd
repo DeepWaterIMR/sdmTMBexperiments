@@ -215,6 +215,12 @@ alone says about its own area.
 To find which survey carries the signal in the compiled index, refit the
 compiled model without each survey with \code{\link[=sdmTMB_leave_out]{sdmTMB_leave_out()}}.
 }
+\section{AI assistance}{
+
+AI-assisted (model not recorded); not yet reviewed in full by the current
+model.
+}
+
 \examples{
 \donttest{
 data(sebastes)

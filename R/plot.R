@@ -43,6 +43,10 @@
 #'
 #' @return A `ggplot` object.
 #'
+#' @section AI assistance:
+#' AI-assisted (model not recorded); not yet reviewed in full by the current
+#' model.
+#'
 #' @author Mikko Vihtakari
 #' @seealso [sdmTMB::make_mesh()], [ggOceanMaps::basemap()]
 #' @import ggplot2
@@ -184,6 +188,10 @@ plot_mesh <- function(
 #'
 #' @return A `ggplot` object.
 #'
+#' @section AI assistance:
+#' AI-assisted (model not recorded); not yet reviewed in full by the current
+#' model.
+#'
 #' @author Mikko Vihtakari
 #' @seealso [ggOceanMaps::basemap()], [ggplot2::continuous_scale()]
 #' @import ggplot2
@@ -300,6 +308,10 @@ plot_prediction_map <- function(
 #'
 #' @return A `ggplot` object.
 #'
+#' @section AI assistance:
+#' AI-assisted (model not recorded); not yet reviewed in full by the current
+#' model.
+#'
 #' @author Mikko Vihtakari
 #' @seealso [ggOceanMaps::basemap()]
 #' @import ggplot2
@@ -401,6 +413,10 @@ tidyr_pivot_longer <- function(d, value_cols, xy_cols, time = NULL) {
 #'
 #' @return A `ggplot` object.
 #'
+#' @section AI assistance:
+#' AI-assisted (model not recorded); not yet reviewed in full by the current
+#' model.
+#'
 #' @author Mikko Vihtakari
 #' @import ggplot2
 #' @importFrom rlang .data
@@ -463,6 +479,10 @@ plot_index <- function(index, facet = TRUE, index_unit = NA, base_size = 11) {
 #' @param base_size Numeric. Base font size. Default `11`.
 #'
 #' @return A `ggplot` object.
+#'
+#' @section AI assistance:
+#' AI-assisted (model not recorded); not yet reviewed in full by the current
+#' model.
 #'
 #' @author Mikko Vihtakari
 #' @seealso [sdmTMB::tidy()], [conditional_effects()]
@@ -534,6 +554,10 @@ plot_fixed_effects <- function(fit, base_size = 11) {
 #' @param base_size Numeric. Base font size. Default `11`.
 #'
 #' @return A `ggplot` object.
+#'
+#' @section AI assistance:
+#' AI-assisted (model not recorded); not yet reviewed in full by the current
+#' model.
 #'
 #' @author Mikko Vihtakari
 #' @seealso [sdmTMB::tidy()]
@@ -614,6 +638,10 @@ plot_variance_partitioning <- function(fit, base_size = 11) {
 #'
 #' @return A `cowplot` grid of two `ggplot` panels.
 #'
+#' @section AI assistance:
+#' AI-assisted (model not recorded); not yet reviewed in full by the current
+#' model.
+#'
 #' @author Mikko Vihtakari
 #' @import ggplot2
 #' @importFrom rlang .data
@@ -686,6 +714,10 @@ plot_prediction_histogram <- function(fit, pred, response = NULL,
 #' @param base_size Numeric. Base font size. Default `11`.
 #'
 #' @return A `ggplot` object.
+#'
+#' @section AI assistance:
+#' AI-assisted (model not recorded); not yet reviewed in full by the current
+#' model.
 #'
 #' @author Mikko Vihtakari
 #' @seealso [stats::residuals()], `sdmTMB::residuals.sdmTMB()`

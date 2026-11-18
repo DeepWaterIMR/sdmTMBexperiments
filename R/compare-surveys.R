@@ -50,6 +50,10 @@
 #'
 #' @return A list of class `sdmTMB_survey_spec`.
 #'
+#' @section AI assistance:
+#' AI-assisted (model not recorded); not yet reviewed in full by the current
+#' model.
+#'
 #' @author Mikko Vihtakari
 #' @seealso [compare_surveys()]
 #' @examples
@@ -274,6 +278,10 @@ survey_spec <- function(
 #'
 #'   Carries `crs`, `coord_multiplier`, `reference_label` and `surveys`
 #'   attributes.
+#'
+#' @section AI assistance:
+#' AI-assisted (model not recorded); not yet reviewed in full by the current
+#' model.
 #'
 #' @author Mikko Vihtakari
 #' @seealso [survey_spec()], [plot.sdmTMB_survey_comparison()],
@@ -811,6 +819,10 @@ compare_surveys <- function(
 #'
 #' @return A `ggplot` object (`type = "index"`/`"scatter"`) or a `cowplot` grid
 #'   (`type = "spatial"`).
+#'
+#' @section AI assistance:
+#' AI-assisted (model not recorded); not yet reviewed in full by the current
+#' model.
 #'
 #' @author Mikko Vihtakari
 #' @seealso [compare_surveys()]

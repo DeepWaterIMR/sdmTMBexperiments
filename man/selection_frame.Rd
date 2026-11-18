@@ -39,6 +39,12 @@ Build the selection frame once, select on it, then fit the \emph{chosen}
 specification to the full data: there is no reason to keep discarding records
 because a covariate that did not enter the model is missing for them.
 }
+\section{AI assistance}{
+
+AI-assisted (model not recorded); not yet reviewed in full by the current
+model.
+}
+
 \examples{
 cands <- list(
   "Full" = density ~ 0 + as.factor(year) + depth_scaled,

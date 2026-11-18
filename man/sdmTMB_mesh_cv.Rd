@@ -84,6 +84,12 @@ AIC (\code{mean_aic}, \code{deltaAIC}) is reported as a rough guide only: AIC va
 of models fitted with different meshes are not strictly comparable, since
 each mesh is a different approximation of the random fields.
 }
+\section{AI assistance}{
+
+AI-assisted (model not recorded); not yet reviewed in full by the current
+model.
+}
+
 \examples{
 \donttest{
 # Requires the 'blockCV' package.

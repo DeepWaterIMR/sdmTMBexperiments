@@ -42,6 +42,12 @@ returned by \code{predict(fit, newdata = ...)} on a \code{\link[ggOceanMaps:base
 a diverging colour scale. Handles delta models (multiple field columns) by
 faceting.
 }
+\section{AI assistance}{
+
+AI-assisted (model not recorded); not yet reviewed in full by the current
+model.
+}
+
 \examples{
 \donttest{
 mesh <- sdmTMB::make_mesh(sdmTMB::pcod, c("X", "Y"), cutoff = 20)

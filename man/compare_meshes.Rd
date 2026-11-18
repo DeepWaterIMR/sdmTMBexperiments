@@ -85,6 +85,12 @@ The alternative meshes are built with \code{\link[sdmTMB:make_mesh]{sdmTMB::make
 uses a barrier mesh, the alternatives have no barrier and a warning is
 given, since the comparison then mixes cutoff and barrier effects.
 }
+\section{AI assistance}{
+
+AI-assisted (model not recorded); not yet reviewed in full by the current
+model.
+}
+
 \examples{
 \donttest{
 mesh <- sdmTMB::make_mesh(sdmTMB::pcod, c("X", "Y"), cutoff = 20)

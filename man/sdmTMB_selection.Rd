@@ -180,6 +180,12 @@ spread over several R sessions (a large spatiotemporal fit can exhaust memory
 when a dozen of them accumulate in one process).
 }
 }
+\section{AI assistance}{
+
+AI-assisted (model not recorded); not yet reviewed in full by the current
+model.
+}
+
 \examples{
 \donttest{
 cands <- list(

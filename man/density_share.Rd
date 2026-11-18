@@ -56,6 +56,12 @@ density shares are the only ones that can move an annual index much. A
 screen of the two largest shares per year plus every share of at least 5 \%
 (hauls) or 10 \% (cruises) has worked well.
 }
+\section{AI assistance}{
+
+AI-assisted (model not recorded); not yet reviewed in full by the current
+model.
+}
+
 \examples{
 data(sebastes)
 # Haul shares, screened to the two largest per year and any share >= 5 \%

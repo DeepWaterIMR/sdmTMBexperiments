@@ -48,6 +48,12 @@ and outside a survey footprint.
 The index is the plug-in sum of predictions times \code{area}, without standard
 errors. Its total over regions equals the plug-in index of the whole grid.
 }
+\section{AI assistance}{
+
+AI-assisted (model not recorded); not yet reviewed in full by the current
+model.
+}
+
 \examples{
 \donttest{
 mesh <- sdmTMB::make_mesh(sdmTMB::pcod, c("X", "Y"), cutoff = 20)

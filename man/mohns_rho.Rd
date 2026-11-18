@@ -54,6 +54,12 @@ For each non-reference series \eqn{p} the terminal (maximum) year
 Mohn's rho is the mean of these relative biases:
 \deqn{\rho = \frac{1}{P} \sum_{p=1}^{P} b_p.}
 }
+\section{AI assistance}{
+
+AI-assisted (model not recorded); not yet reviewed in full by the current
+model.
+}
+
 \examples{
 idx <- data.frame(
   peel = rep(c("peel 0", "peel 1", "peel 2"), each = 5),

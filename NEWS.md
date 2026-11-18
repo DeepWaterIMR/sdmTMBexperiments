@@ -1,3 +1,9 @@
+# sdmTMBexperiments 0.1.11
+
+2026-11-18 Disclosure of generative-AI use.
+
+* The README and `?sdmTMBexperiments` gain a "Use of generative AI" statement, and each function's help page an "AI assistance" section recording the model that wrote it and the last model that reviewed it in full. AI tools are not listed as authors.
+
 # sdmTMBexperiments 0.1.10
 
 2026-11-17 Conditional-effects figure for sdmTMB fits.

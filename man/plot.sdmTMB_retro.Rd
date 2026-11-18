@@ -27,6 +27,12 @@ Creates a layered ggplot of retrospective (peeled) indices produced by
 \code{\link[=sdmTMB_retro]{sdmTMB_retro()}}, with confidence ribbons for each peel and Mohn's rho
 (computed with \code{\link[=mohns_rho]{mohns_rho()}}) annotated on the plot.
 }
+\section{AI assistance}{
+
+AI-assisted (model not recorded); not yet reviewed in full by the current
+model.
+}
+
 \examples{
 \donttest{
 mesh <- sdmTMB::make_mesh(sdmTMB::pcod, c("X", "Y"), cutoff = 25)

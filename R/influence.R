@@ -35,6 +35,10 @@
 #'   [sdmTMB_leave_out()]. A `candidate` column is added when `top_n` or
 #'   `min_share` is given.
 #'
+#' @section AI assistance:
+#' AI-assisted (model not recorded); not yet reviewed in full by the current
+#' model.
+#'
 #' @author Mikko Vihtakari
 #' @seealso [sdmTMB_leave_out()], [index_by_region()]
 #' @importFrom rlang .data
@@ -133,6 +137,10 @@ density_share <- function(
 #'   total) and `rel_mean` (`est` divided by the region's mean over
 #'   `ref_years`).
 #'
+#' @section AI assistance:
+#' AI-assisted (model not recorded); not yet reviewed in full by the current
+#' model.
+#'
 #' @author Mikko Vihtakari
 #' @seealso [plot.sdmTMB_region_index()], [density_share()],
 #'   [sdmTMB_leave_out()]
@@ -212,6 +220,10 @@ index_by_region <- function(
 #' @param base_size Numeric. Base font size. Default `11`.
 #' @param ... Currently ignored.
 #' @return A `ggplot` object.
+#' @section AI assistance:
+#' AI-assisted (model not recorded); not yet reviewed in full by the current
+#' model.
+#'
 #' @author Mikko Vihtakari
 #' @seealso [index_by_region()]
 #' @importFrom rlang .data

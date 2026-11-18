@@ -53,6 +53,10 @@
 #'   contains an `index` data frame (and, if `save_models = TRUE`, the fitted
 #'   model object).
 #'
+#' @section AI assistance:
+#' AI-assisted (model not recorded); not yet reviewed in full by the current
+#' model.
+#'
 #' @author Mikko Vihtakari, with examples and documentation adapted from the
 #'   \pkg{sdmTMB} package.
 #' @seealso [sdmTMB::sdmTMB()], [sdmTMB::get_index()], [plot.sdmTMB_retro()]
@@ -188,6 +192,10 @@ sdmTMB_retro <- function(
 #' @param ... Currently ignored.
 #'
 #' @return A `ggplot` object.
+#'
+#' @section AI assistance:
+#' AI-assisted (model not recorded); not yet reviewed in full by the current
+#' model.
 #'
 #' @author Mikko Vihtakari
 #' @seealso [sdmTMB_retro()], [mohns_rho()]

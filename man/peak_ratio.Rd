@@ -28,6 +28,12 @@ Quantifies a peak (or trough) in an index as the value in \code{year} divided by
 the mean of the \code{neighbours}. A ratio is unaffected by the level of the
 index, so it compares scenarios with different prediction grids.
 }
+\section{AI assistance}{
+
+AI-assisted (model not recorded); not yet reviewed in full by the current
+model.
+}
+
 \examples{
 idx <- data.frame(year = 2000:2004, est = c(10, 11, 20, 12, 10))
 peak_ratio(idx, year = 2002)

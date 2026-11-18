@@ -30,6 +30,12 @@ it would invite exactly the comparison the table should be warning against.
 \code{group} exists for that case: weights are computed within each group, and left
 \code{NA} for groups with a single member.
 }
+\section{AI assistance}{
+
+AI-assisted (model not recorded); not yet reviewed in full by the current
+model.
+}
+
 \examples{
 tab <- data.frame(
   model = c("a", "b", "c"),

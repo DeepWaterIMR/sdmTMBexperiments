@@ -21,6 +21,10 @@
 #'
 #' @return An `sf` polygon (single feature) in the given `crs`.
 #'
+#' @section AI assistance:
+#' AI-assisted (model not recorded); not yet reviewed in full by the current
+#' model.
+#'
 #' @author Mikko Vihtakari
 #' @seealso [make_prediction_grid()], [compare_surveys()]
 #' @importFrom rlang .data
@@ -130,6 +134,10 @@ make_survey_prediction_region <- function(
 #'   [plot.sdmTMB_prediction_grid()] can be used on it directly) with columns
 #'   `X`, `Y` (in model units) and, when depth filtering is applied, a `depth`
 #'   column. Carries `crs`, `coord_multiplier` and `resolution` attributes.
+#'
+#' @section AI assistance:
+#' AI-assisted (model not recorded); not yet reviewed in full by the current
+#' model.
 #'
 #' @author Mikko Vihtakari
 #' @seealso [make_survey_prediction_region()], [plot.sdmTMB_prediction_grid()]
@@ -246,6 +254,10 @@ make_prediction_grid <- function(
 #' @param ... Currently ignored.
 #'
 #' @return A `ggplot` object.
+#'
+#' @section AI assistance:
+#' AI-assisted (model not recorded); not yet reviewed in full by the current
+#' model.
 #'
 #' @author Mikko Vihtakari
 #' @seealso [make_prediction_grid()], [ggOceanMaps::basemap()]

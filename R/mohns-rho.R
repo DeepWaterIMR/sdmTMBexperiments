@@ -34,6 +34,10 @@
 #' @return A single numeric value (the mean relative bias). Returns `NA` if no
 #'   valid comparisons can be made.
 #'
+#' @section AI assistance:
+#' AI-assisted (model not recorded); not yet reviewed in full by the current
+#' model.
+#'
 #' @author Mikko Vihtakari
 #' @examples
 #' idx <- data.frame(

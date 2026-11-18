@@ -30,6 +30,17 @@ filenames, dataset versions tied to one computer, or contact details beyond the
 maintainer's public package metadata. Use placeholders: `~/...`,
 `path/to/your/file`, `<your-data-folder>`.
 
+## AI-use disclosure
+
+AI tools are never listed in `Authors@R`, `@author` or the citation; the
+maintainer is the author. The README and `?sdmTMBexperiments` carry a "Use of
+generative AI" statement, and every documented function has an
+`@section AI assistance:` record. Before changing a function whose record names
+another model than yours, review the whole function (helpers, tests, docs),
+report suggested changes to the maintainer, apply only approved ones, then set
+the record to "reviewed in full by <your model>, <date>". Rules:
+[memory/ai-disclosure.md](memory/ai-disclosure.md).
+
 ## Common commands
 
 ```r

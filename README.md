@@ -66,12 +66,13 @@ nd <- replicate_df(qcs_grid, "year", unique(pcod$year))
 
 # Compare two models: indices, spatial prediction differences, Mohn's rho
 cmp <- compare_models(m1, m2, newdata = nd, object_crs = 32609)
-#> ℹ `ln_tau_O` is an internal parameter affecting `sigma_O`
-#> ℹ `sigma_O` is the spatial standard deviation
-#> ℹ `ln_tau_E` is an internal parameter affecting `sigma_E`
-#> ℹ `sigma_E` is the spatiotemporal standard deviation
-#> ℹ `ln_kappa` is an internal parameter affecting `range`
-#> ℹ `range` is the distance at which data are effectively independent
+#> i `ln_tau_O` is an internal parameter affecting `sigma_O`
+#> i `sigma_O` is the spatial standard deviation
+#> i `ln_tau_E` is an internal parameter affecting `sigma_E`
+#> i `sigma_E` is the spatiotemporal standard deviation
+#> i `ln_kappa` is an internal parameter affecting `range`
+#> i `range` is the distance at which data are effectively independent
+#> Warning: package 'future' was built under R version 4.6.1
 plot(cmp)
 ```
 
@@ -79,6 +80,9 @@ plot(cmp)
 
 ``` r
 plot(cmp, type = "spatial")
+#> Registered S3 method overwritten by 'stars':
+#>   method                  from
+#>   st_interpolate_aw.stars sf
 ```
 
 <img src="man/figures/README-example-2.png" alt="" width="100%" />
@@ -101,7 +105,7 @@ utils::citation("sdmTMBexperiments", auto = as.list(read.dcf("DESCRIPTION")[1, ]
 #> To cite package 'sdmTMBexperiments' in publications use:
 #> 
 #>   Vihtakari M (2026). _sdmTMBexperiments: Experimental Helper Functions
-#>   for 'sdmTMB'_. R package version 0.1.10,
+#>   for 'sdmTMB'_. R package version 0.1.11,
 #>   <https://github.com/DeepWaterIMR/sdmTMBexperiments>.
 #> 
 #> A BibTeX entry for LaTeX users is
@@ -110,7 +114,19 @@ utils::citation("sdmTMBexperiments", auto = as.list(read.dcf("DESCRIPTION")[1, ]
 #>     title = {sdmTMBexperiments: Experimental Helper Functions for 'sdmTMB'},
 #>     author = {Mikko Vihtakari},
 #>     year = {2026},
-#>     note = {R package version 0.1.10},
+#>     note = {R package version 0.1.11},
 #>     url = {https://github.com/DeepWaterIMR/sdmTMBexperiments},
 #>   }
 ```
+
+## Use of generative AI
+
+Much of the code, tests and documentation in this package were written
+with an AI coding assistant (Claude Opus 5.5, Anthropic) from the
+maintainer’s prototypes and instructions. The maintainer reviewed,
+tested and accepted all AI-generated material and is responsible for it.
+Commits made with AI assistance carry a `Co-Authored-By` line in the Git
+history, and each function’s help page has an “AI assistance” section
+recording the model that wrote it and the last model that reviewed it in
+full. This follows the [rOpenSci policy on generative AI in software
+review](https://ropensci.org/blog/2026/02/26/ropensci-ai-policy/).

@@ -24,6 +24,10 @@
 #'
 #' @return A `ggplot` object.
 #'
+#' @section AI assistance:
+#' AI-assisted (model not recorded); not yet reviewed in full by the current
+#' model.
+#'
 #' @author Mikko Vihtakari
 #' @seealso [ggOceanMaps::basemap()]
 #' @import ggplot2

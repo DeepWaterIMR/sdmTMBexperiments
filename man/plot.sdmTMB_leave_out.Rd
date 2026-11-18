@@ -46,6 +46,12 @@ haul share (\code{type = "leverage"}), where identifiers above the
 \code{leverage_limit} line and the \code{influence_limit} line are labelled. Years
 without data after removing an identifier are gaps.
 }
+\section{AI assistance}{
+
+AI-assisted (model not recorded); not yet reviewed in full by the current
+model.
+}
+
 \examples{
 \donttest{
 data(sebastes)

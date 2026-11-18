@@ -41,6 +41,12 @@ positions, using a concave hull (\code{\link[concaveman:concaveman]{concaveman::
 restrict a prediction grid to the area a survey actually covers, rather than
 the full model domain.
 }
+\section{AI assistance}{
+
+AI-assisted (model not recorded); not yet reviewed in full by the current
+model.
+}
+
 \examples{
 \donttest{
 data(sebastes)

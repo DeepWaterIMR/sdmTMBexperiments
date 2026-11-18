@@ -49,6 +49,10 @@
 #' uses a barrier mesh, the alternatives have no barrier and a warning is
 #' given, since the comparison then mixes cutoff and barrier effects.
 #'
+#' @section AI assistance:
+#' AI-assisted (model not recorded); not yet reviewed in full by the current
+#' model.
+#'
 #' @author Mikko Vihtakari
 #' @seealso [sdmTMB::sdmTMB()], [sdmTMB::get_index_split()],
 #'   [plot.sdmTMB_mesh_comparison()]
@@ -266,6 +270,10 @@ compare_meshes <- function(
 #'
 #' @return A `ggplot` object (`type = "index"`) or a `cowplot` grid
 #'   (`type = "spatial"`).
+#'
+#' @section AI assistance:
+#' AI-assisted (model not recorded); not yet reviewed in full by the current
+#' model.
 #'
 #' @author Mikko Vihtakari
 #' @seealso [compare_meshes()]

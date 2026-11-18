@@ -25,6 +25,12 @@ Plots one or more index time series (each from \code{\link[sdmTMB:get_index]{sdm
 \code{\link[sdmTMB:get_index_split]{sdmTMB::get_index_split()}}) with confidence ribbons. A named list of indices
 is faceted or coloured by name.
 }
+\section{AI assistance}{
+
+AI-assisted (model not recorded); not yet reviewed in full by the current
+model.
+}
+
 \examples{
 idx <- data.frame(year = 2000:2010, est = runif(11, 5, 9))
 idx$lwr <- idx$est * 0.8

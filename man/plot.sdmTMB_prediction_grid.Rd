@@ -59,6 +59,12 @@ Draws the points of a \code{\link[=make_prediction_grid]{make_prediction_grid()}
 \code{\link[ggOceanMaps:basemap]{ggOceanMaps::basemap()}}, approximating the actual grid cells. Optionally
 colours the squares by a column (\code{depth} by default, when present).
 }
+\section{AI assistance}{
+
+AI-assisted (model not recorded); not yet reviewed in full by the current
+model.
+}
+
 \examples{
 \donttest{
 data(sebastes)

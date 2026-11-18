@@ -64,6 +64,10 @@
 #'     change from the baseline over the years) and `all_ok` (whether the
 #'     refit passed [sdmTMB::sanity()]).
 #'
+#' @section AI assistance:
+#' AI-assisted (model not recorded); not yet reviewed in full by the current
+#' model.
+#'
 #' @author Mikko Vihtakari
 #' @seealso [peak_ratio()], [plot.sdmTMB_data_scenarios()],
 #'   [sdmTMB_leave_out()], [density_share()]
@@ -291,6 +295,10 @@ sdmTMB_data_scenarios <- function(
 #' @return A tibble with the group, `peak` (the index in `year`),
 #'   `neighbours` (mean of the neighbouring years) and `peak_ratio`.
 #'
+#' @section AI assistance:
+#' AI-assisted (model not recorded); not yet reviewed in full by the current
+#' model.
+#'
 #' @author Mikko Vihtakari
 #' @seealso [sdmTMB_data_scenarios()]
 #' @importFrom rlang .data
@@ -340,6 +348,10 @@ peak_ratio <- function(x, year, neighbours = c(year - 1, year + 1), group = NULL
 #' @param base_size Numeric. Base font size. Default `11`.
 #' @param ... Currently ignored.
 #' @return A `ggplot` object.
+#' @section AI assistance:
+#' AI-assisted (model not recorded); not yet reviewed in full by the current
+#' model.
+#'
 #' @author Mikko Vihtakari
 #' @seealso [sdmTMB_data_scenarios()]
 #' @importFrom rlang .data

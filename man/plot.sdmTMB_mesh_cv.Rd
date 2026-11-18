@@ -22,6 +22,12 @@ A \code{ggplot} object.
 \description{
 Plot mesh cross-validation results
 }
+\section{AI assistance}{
+
+AI-assisted (model not recorded); not yet reviewed in full by the current
+model.
+}
+
 \examples{
 \donttest{
 # Requires the 'blockCV' package.

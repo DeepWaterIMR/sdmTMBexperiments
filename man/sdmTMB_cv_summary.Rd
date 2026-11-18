@@ -40,6 +40,12 @@ with a non-positive-definite Hessian still yields point predictions, so it
 contributes to all three criteria while signalling that its optimum is not
 trustworthy — the count has to be shown or the reader cannot see it.
 }
+\section{AI assistance}{
+
+AI-assisted (model not recorded); not yet reviewed in full by the current
+model.
+}
+
 \examples{
 \donttest{
 mesh <- sdmTMB::make_mesh(sdmTMB::pcod, c("X", "Y"), cutoff = 25)

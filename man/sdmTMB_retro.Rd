@@ -89,6 +89,12 @@ only \code{data} and \code{mesh} are replaced. Arguments of the original call ar
 evaluated in the environment of the model formula, so objects referenced
 there (e.g. \code{priors = my_priors}) must still exist.
 }
+\section{AI assistance}{
+
+AI-assisted (model not recorded); not yet reviewed in full by the current
+model.
+}
+
 \examples{
 \donttest{
 mesh <- sdmTMB::make_mesh(sdmTMB::pcod, c("X", "Y"), cutoff = 25)

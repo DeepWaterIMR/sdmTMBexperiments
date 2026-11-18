@@ -71,6 +71,12 @@ present (e.g. from \code{sdmTMBextra::add_barrier_mesh()}, from the GitHub-only
 \href{https://github.com/pbs-assess/sdmTMBextra}{sdmTMBextra} package), the
 barrier ("land") triangles are marked with an \code{X}.
 }
+\section{AI assistance}{
+
+AI-assisted (model not recorded); not yet reviewed in full by the current
+model.
+}
+
 \examples{
 \donttest{
 mesh <- sdmTMB::make_mesh(sdmTMB::pcod, c("X", "Y"), cutoff = 15)
