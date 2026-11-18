@@ -31,6 +31,12 @@ happens to be sorted; a later change of sort key then silently changes which
 model the document claims to have selected. Use this instead — including to
 build a cross-validation shortlist from an AIC ladder, via \code{n}.
 }
+\section{AI assistance}{
+
+AI-assisted (model not recorded); not yet reviewed in full by the current
+model.
+}
+
 \examples{
 tab <- data.frame(
   model = c("a", "b", "c"), AIC = c(1002, 1000, 1010),

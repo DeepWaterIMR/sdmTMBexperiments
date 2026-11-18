@@ -55,6 +55,12 @@ Draws a bubble map of a response variable (e.g. catch density) over a
 positive observations as size- and colour-scaled circles. Useful for a quick
 overview of survey data before modelling.
 }
+\section{AI assistance}{
+
+AI-assisted (model not recorded); not yet reviewed in full by the current
+model.
+}
+
 \examples{
 \donttest{
 data(sebastes)

@@ -37,6 +37,12 @@ not of the fitted smooth) and spatially varying coefficient SDs
 (\code{sigma_Z}, whose contribution scales with the covariate). The proportions
 are therefore of the variance of the included components only.
 }
+\section{AI assistance}{
+
+AI-assisted (model not recorded); not yet reviewed in full by the current
+model.
+}
+
 \examples{
 \donttest{
 mesh <- sdmTMB::make_mesh(sdmTMB::pcod, c("X", "Y"), cutoff = 20)

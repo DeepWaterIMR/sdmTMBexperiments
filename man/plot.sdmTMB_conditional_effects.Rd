@@ -52,6 +52,12 @@ line marks the reference value of each term. Panel slots are aligned across
 models, so the same term lines up in every row; a model without a term
 leaves its slot empty.
 }
+\section{AI assistance}{
+
+Written with Claude Opus 5.5 (Anthropic); reviewed in full by Claude Opus
+5.5 (Anthropic), 2026-11-17.
+}
+
 \examples{
 \donttest{
 d <- subset(sebastes, year >= 2021 & cruiseseries \%in\% c("EcoS", "EggaN"))

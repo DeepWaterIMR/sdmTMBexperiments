@@ -60,6 +60,12 @@ spatial resolution. Optionally filters the grid by depth using a
 user-supplied depth function. Coordinates are returned in the same units as
 the model (divided by \code{coord_multiplier}).
 }
+\section{AI assistance}{
+
+AI-assisted (model not recorded); not yet reviewed in full by the current
+model.
+}
+
 \examples{
 \donttest{
 data(sebastes)

@@ -28,6 +28,10 @@
 #'   the columns that were checked are attached as the `"dropped"` and
 #'   `"columns"` attributes.
 #'
+#' @section AI assistance:
+#' AI-assisted (model not recorded); not yet reviewed in full by the current
+#' model.
+#'
 #' @author Mikko Vihtakari
 #' @seealso [sdmTMB_selection()]
 #'
@@ -86,6 +90,10 @@ selection_frame <- function(data, candidates, formula = NULL, extra = NULL) {
 #'
 #' @return `x` with `deltaAIC` and `AICweight` columns, sorted by AIC within
 #'   group.
+#'
+#' @section AI assistance:
+#' AI-assisted (model not recorded); not yet reviewed in full by the current
+#' model.
 #'
 #' @author Mikko Vihtakari
 #' @seealso [sdmTMB_selection()]
@@ -156,6 +164,10 @@ add_aic_weights <- function(x, group = NULL, aic_col = "AIC") {
 #' @return A one-row tibble with `model`, `folds`, `folds_pdhess`, `n_heldout`,
 #'   `cv_loglik` (per held-out observation; higher is better), `cv_RMSE`,
 #'   `cv_MAE` and `cv_crashed`.
+#'
+#' @section AI assistance:
+#' AI-assisted (model not recorded); not yet reviewed in full by the current
+#' model.
 #'
 #' @author Mikko Vihtakari
 #' @seealso [sdmTMB::sdmTMB_cv()], [sdmTMB_selection()]
@@ -332,6 +344,10 @@ sdmTMB_cv_summary <- function(x, label = NA_character_, response = NULL) {
 #'   (named list of [sdmTMB::sdmTMB_cv()] objects, or `NULL`) and `candidates`
 #'   (the resolved specifications). Print it, plot it with
 #'   [plot.sdmTMB_selection()], and query it with [best_candidate()].
+#'
+#' @section AI assistance:
+#' AI-assisted (model not recorded); not yet reviewed in full by the current
+#' model.
 #'
 #' @author Mikko Vihtakari
 #' @seealso [selection_frame()], [best_candidate()],
@@ -593,6 +609,10 @@ sdmTMB_selection <- function(
 #'
 #' @return A character vector of candidate names, best first.
 #'
+#' @section AI assistance:
+#' AI-assisted (model not recorded); not yet reviewed in full by the current
+#' model.
+#'
 #' @author Mikko Vihtakari
 #' @seealso [sdmTMB_selection()]
 #'
@@ -694,6 +714,10 @@ print.sdmTMB_selection <- function(x, ...) {
 #' @param ... Currently ignored.
 #'
 #' @return A `ggplot` object.
+#'
+#' @section AI assistance:
+#' AI-assisted (model not recorded); not yet reviewed in full by the current
+#' model.
 #'
 #' @author Mikko Vihtakari
 #' @seealso [sdmTMB_selection()]

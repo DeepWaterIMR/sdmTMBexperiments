@@ -97,6 +97,10 @@
 #'   `value`, `xnum`, `source`, where `source` is `"peak"`, `"mode"`, `"last"`,
 #'   `"median"` or `"user"`).
 #'
+#' @section AI assistance:
+#' Written with Claude Opus 5.5 (Anthropic); reviewed in full by Claude Opus
+#' 5.5 (Anthropic), 2026-11-17.
+#'
 #' @author Mikko Vihtakari
 #' @seealso [plot.sdmTMB_conditional_effects()], [effects_reference_text()],
 #'   [plot_fixed_effects()], [sdmTMB::predict.sdmTMB()]
@@ -401,6 +405,10 @@ print.sdmTMB_conditional_effects <- function(x, ...) {
 #'
 #' @return A `cowplot` grid (a `ggplot` object).
 #'
+#' @section AI assistance:
+#' Written with Claude Opus 5.5 (Anthropic); reviewed in full by Claude Opus
+#' 5.5 (Anthropic), 2026-11-17.
+#'
 #' @author Mikko Vihtakari
 #' @seealso [conditional_effects()], [effects_reference_text()]
 #' @examples
@@ -524,6 +532,10 @@ plot.sdmTMB_conditional_effects <- function(x, fit = NULL, data = NULL,
 #'   Default `3`.
 #'
 #' @return A character string.
+#'
+#' @section AI assistance:
+#' Written with Claude Opus 5.5 (Anthropic); reviewed in full by Claude Opus
+#' 5.5 (Anthropic), 2026-11-17.
 #'
 #' @author Mikko Vihtakari
 #' @seealso [conditional_effects()]

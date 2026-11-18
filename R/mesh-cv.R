@@ -52,6 +52,10 @@
 #'   list of [sdmTMB::sdmTMB_cv()] objects is attached as the `"cv"`
 #'   attribute.
 #'
+#' @section AI assistance:
+#' AI-assisted (model not recorded); not yet reviewed in full by the current
+#' model.
+#'
 #' @author Mikko Vihtakari
 #' @seealso [sdmTMB::sdmTMB_cv()], [blockCV::cv_spatial()], [compare_meshes()]
 #'
@@ -223,6 +227,10 @@ sdmTMB_mesh_cv <- function(
 #' @param ... Currently ignored.
 #'
 #' @return A `ggplot` object.
+#' @section AI assistance:
+#' AI-assisted (model not recorded); not yet reviewed in full by the current
+#' model.
+#'
 #' @author Mikko Vihtakari
 #' @seealso [sdmTMB_mesh_cv()]
 #' @import ggplot2

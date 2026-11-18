@@ -74,6 +74,10 @@
 #' is `influence >= 0.1 & leverage >= 2`; see `plot(x, type = "leverage")`.
 #' Screen candidates cheaply first with [density_share()].
 #'
+#' @section AI assistance:
+#' AI-assisted (model not recorded); not yet reviewed in full by the current
+#' model.
+#'
 #' @author Mikko Vihtakari
 #' @seealso [density_share()], [sdmTMB_data_scenarios()], [compare_surveys()],
 #'   [sdmTMB_retro()], [plot.sdmTMB_leave_out()]
@@ -281,6 +285,10 @@ sdmTMB_leave_out <- function(
 #' @param ... Currently ignored.
 #'
 #' @return A `ggplot` object.
+#'
+#' @section AI assistance:
+#' AI-assisted (model not recorded); not yet reviewed in full by the current
+#' model.
 #'
 #' @author Mikko Vihtakari
 #' @seealso [sdmTMB_leave_out()]

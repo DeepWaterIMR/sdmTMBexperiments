@@ -60,6 +60,12 @@ Maps predicted response values from \code{\link[stats:predict]{stats::predict()}
 \code{\link[ggOceanMaps:basemap]{ggOceanMaps::basemap()}}, either averaged over time (\code{type = "mean"}) or
 faceted by time (\code{type = "annual"}).
 }
+\section{AI assistance}{
+
+AI-assisted (model not recorded); not yet reviewed in full by the current
+model.
+}
+
 \examples{
 \donttest{
 mesh <- sdmTMB::make_mesh(sdmTMB::pcod, c("X", "Y"), cutoff = 20)

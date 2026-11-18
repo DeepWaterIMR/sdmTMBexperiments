@@ -110,6 +110,12 @@ is \code{influence >= 0.1 & leverage >= 2}; see \code{plot(x, type = "leverage")
 Screen candidates cheaply first with \code{\link[=density_share]{density_share()}}.
 }
 
+\section{AI assistance}{
+
+AI-assisted (model not recorded); not yet reviewed in full by the current
+model.
+}
+
 \examples{
 \donttest{
 data(sebastes)

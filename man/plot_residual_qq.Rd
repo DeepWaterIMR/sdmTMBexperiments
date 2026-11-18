@@ -21,6 +21,12 @@ A \code{ggplot} object.
 Computes randomized quantile residuals for each family component of a fitted
 sdmTMB model and draws a Q-Q plot. Delta models are faceted by component.
 }
+\section{AI assistance}{
+
+AI-assisted (model not recorded); not yet reviewed in full by the current
+model.
+}
+
 \examples{
 \donttest{
 mesh <- sdmTMB::make_mesh(sdmTMB::pcod, c("X", "Y"), cutoff = 20)

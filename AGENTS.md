@@ -11,7 +11,9 @@ fitted `sdmTMB` models: model comparison, mesh-resolution sensitivity,
 retrospective analysis, survey-specific index comparison, prediction-grid
 construction, and diagnostic/result plotting. Functions are generic (nothing is
 hard-coded to a species or region) and may later be adopted into `sdmTMB`
-itself. Cite the developer when you reuse them.
+itself. Cite the developer when you reuse them. Use of AI coding assistants in
+writing the package is disclosed in the README ("Use of generative AI"); AI
+tools are not package authors.
 
 Maps are drawn on [ggOceanMaps](https://mikkovihtakari.github.io/ggOceanMaps/)
 basemaps, which is the package's default map-plotting tool.

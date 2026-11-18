@@ -36,6 +36,12 @@ If the model has an offset, the observed response is divided by
 \code{exp(offset)} (e.g. catch per unit swept area), so it is on the same scale
 as predictions made without an offset (as for a prediction grid).
 }
+\section{AI assistance}{
+
+AI-assisted (model not recorded); not yet reviewed in full by the current
+model.
+}
+
 \examples{
 \donttest{
 mesh <- sdmTMB::make_mesh(sdmTMB::pcod, c("X", "Y"), cutoff = 20)

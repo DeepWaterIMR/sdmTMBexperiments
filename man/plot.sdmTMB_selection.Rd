@@ -53,6 +53,12 @@ by whether it crashed, failed to converge or failed \code{\link[sdmTMB:sanity]{s
 produces, which answers the question a selection table cannot: \emph{does this
 choice actually move the index?}
 }
+\section{AI assistance}{
+
+AI-assisted (model not recorded); not yet reviewed in full by the current
+model.
+}
+
 \examples{
 \donttest{
 cands <- list(

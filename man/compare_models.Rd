@@ -72,6 +72,12 @@ per-grid-cell prediction differences relative to a reference model, and model
 sanity checks. The result can be plotted with
 \code{\link[=plot.sdmTMB_model_comparison]{plot.sdmTMB_model_comparison()}}.
 }
+\section{AI assistance}{
+
+AI-assisted (model not recorded); not yet reviewed in full by the current
+model.
+}
+
 \examples{
 \donttest{
 mesh <- sdmTMB::make_mesh(sdmTMB::pcod, c("X", "Y"), cutoff = 20)

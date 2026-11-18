@@ -83,6 +83,12 @@ years can be combined with the series as a fixed effect
 (\code{formula = value ~ 0 + cruiseseries + s(depth)}) and predicted for one of
 them (\code{predict_values = list(cruiseseries = "SeriesA")}).
 }
+\section{AI assistance}{
+
+AI-assisted (model not recorded); not yet reviewed in full by the current
+model.
+}
+
 \examples{
 # Two series that alternate years, combined with the series as a fixed
 # effect and AR(1) fields that bridge the alternating gaps

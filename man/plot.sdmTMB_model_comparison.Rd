@@ -89,6 +89,12 @@ percent-based summary, since a cell's overall multi-year baseline is used
 in the denominator instead of each individual year's value.
 }
 }
+\section{AI assistance}{
+
+AI-assisted (model not recorded); not yet reviewed in full by the current
+model.
+}
+
 \examples{
 \donttest{
 mesh <- sdmTMB::make_mesh(sdmTMB::pcod, c("X", "Y"), cutoff = 20)

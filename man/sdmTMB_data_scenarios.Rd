@@ -100,6 +100,12 @@ remove an anomaly that builds up over many moderate hauls of one cruise; use
 \code{\link[=sdmTMB_leave_out]{sdmTMB_leave_out()}} to see whether an anomaly is driven by single hauls or
 by whole cruises.
 }
+\section{AI assistance}{
+
+AI-assisted (model not recorded); not yet reviewed in full by the current
+model.
+}
+
 \examples{
 \donttest{
 data(sebastes)

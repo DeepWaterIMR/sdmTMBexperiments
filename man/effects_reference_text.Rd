@@ -22,6 +22,12 @@ effect; Model A), 389 (Model B); geartype Shrimp (most common level); year
 2025 (last level)". References that differ between models are listed per
 model.
 }
+\section{AI assistance}{
+
+Written with Claude Opus 5.5 (Anthropic); reviewed in full by Claude Opus
+5.5 (Anthropic), 2026-11-17.
+}
+
 \examples{
 \donttest{
 d <- subset(sebastes, year >= 2021 & cruiseseries \%in\% c("EcoS", "EggaN"))

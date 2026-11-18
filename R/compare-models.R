@@ -40,6 +40,10 @@
 #'   `year`. Carries `crs`, `coord_multiplier`, `reference_model` and
 #'   `model_names` attributes.
 #'
+#' @section AI assistance:
+#' AI-assisted (model not recorded); not yet reviewed in full by the current
+#' model.
+#'
 #' @author Mikko Vihtakari
 #' @seealso [sdmTMB::sdmTMB()], [sdmTMB::get_index_split()],
 #'   [plot.sdmTMB_model_comparison()]
@@ -244,6 +248,10 @@ compare_models <- function(
 #'
 #' @return A `ggplot` object (`type = "index"`) or a `cowplot` grid
 #'   (`type = "spatial"`).
+#'
+#' @section AI assistance:
+#' AI-assisted (model not recorded); not yet reviewed in full by the current
+#' model.
 #'
 #' @author Mikko Vihtakari
 #' @seealso [compare_models()]

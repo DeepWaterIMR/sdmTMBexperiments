@@ -38,6 +38,12 @@ A \code{ggplot} object.
 \description{
 Plot data-filter scenarios
 }
+\section{AI assistance}{
+
+AI-assisted (model not recorded); not yet reviewed in full by the current
+model.
+}
+
 \seealso{
 \code{\link[=sdmTMB_data_scenarios]{sdmTMB_data_scenarios()}}
 }
