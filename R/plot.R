@@ -158,8 +158,22 @@ plot_mesh <- function(
 #'
 #' @description
 #' Maps predicted response values from [stats::predict()] output on a
-#' [ggOceanMaps::basemap()], either averaged over time (`type = "mean"`) or
-#' faceted by time (`type = "annual"`).
+#' [ggOceanMaps::basemap()], either averaged over time (`type = "mean"`),
+#' faceted by time (`type = "annual"`), or as the annual difference from each
+#' cell's mean over time (`type = "anomaly"`), faceted by time.
+#'
+#' @details
+#' For `type = "anomaly"`, each cell's value in a year is compared with the mean
+#' of that cell over all years, \eqn{x_{c,t} - \bar{x}_c}, and expressed as set
+#' by `anomaly`: `"max_percent"` (default) divides it by the largest cell mean
+#' and multiplies by 100, so that all panels share one scale relative to the
+#' densest cell and sparse cells do not produce large percentages;
+#' `"cell_percent"` divides it by the cell's own mean (percent change of the
+#' cell); `"absolute"` keeps the response units. The anomaly map uses a
+#' diverging scale centred on zero; `transform = "sqrt"` applies a signed
+#' square root, which keeps the sign and makes small differences visible.
+#' Use `column` on the response scale (e.g. `predict(..., type = "response")`
+#' or `exp()` of a log prediction) for an anomaly of density.
 #'
 #' @param pred A prediction data frame from `predict(fit, newdata = ...)`,
 #'   containing coordinate columns and the response column. If the response
@@ -169,12 +183,15 @@ plot_mesh <- function(
 #'   `predict(fit, newdata = ..., type = "response")` for density-scale values.
 #' @param crs Coordinate reference system (projected, in metres).
 #' @param column Character. Name of the response column. Default `"est"`.
-#' @param type Character. `"mean"` (default) or `"annual"`.
-#' @param time_col Character. Name of the time column (for `type = "annual"`).
-#'   Default `"year"`.
+#' @param type Character. `"mean"` (default), `"annual"` or `"anomaly"`.
+#' @param time_col Character. Name of the time column (for `type = "annual"`
+#'   and `"anomaly"`). Default `"year"`.
 #' @param transform Character. Fill-scale transformation, passed to
 #'   `transform` in [ggplot2::continuous_scale()] (the successor to the
-#'   now-deprecated `trans` argument). Default `"identity"`.
+#'   now-deprecated `trans` argument). Default `"identity"`. For
+#'   `type = "anomaly"`, `"sqrt"` is a signed square root.
+#' @param anomaly Character. Scale of the anomaly for `type = "anomaly"`:
+#'   `"max_percent"` (default), `"cell_percent"` or `"absolute"`. See Details.
 #' @param fill_limits Numeric vector of length two (either element may be
 #'   `NA`), passed to `limits` in [ggplot2::continuous_scale()]. Values outside
 #'   the limits are mapped to `NA` by ggplot2 and rendered as blank/grey cells.
@@ -190,7 +207,7 @@ plot_mesh <- function(
 #'
 #' @section AI assistance:
 #' AI-assisted (model not recorded); not yet reviewed in full by the current
-#' model.
+#' model. Edited by Claude Opus 5.5 (Anthropic), 2026-11-24.
 #'
 #' @author Mikko Vihtakari
 #' @seealso [ggOceanMaps::basemap()], [ggplot2::continuous_scale()]
@@ -212,15 +229,17 @@ plot_prediction_map <- function(
   pred,
   crs,
   column = "est",
-  type = c("mean", "annual"),
+  type = c("mean", "annual", "anomaly"),
   time_col = "year",
   transform = "identity",
   fill_limits = NULL,
+  anomaly = c("max_percent", "cell_percent", "absolute"),
   xy_cols = c("X", "Y"),
   coord_multiplier = 1000,
   base_size = 11
 ) {
   type <- match.arg(type)
+  anomaly <- match.arg(anomaly)
 
   d <- pred
   if (type == "mean") {
@@ -235,6 +254,16 @@ plot_prediction_map <- function(
       time = pred[[time_col]]
     )
     names(d)[1:2] <- xy_cols
+  }
+  if (type == "anomaly") {
+    cell <- paste(d[[xy_cols[1]]], d[[xy_cols[2]]])
+    cell_mean <- stats::ave(d$value, cell, FUN = function(x) mean(x, na.rm = TRUE))
+    diff <- d$value - cell_mean
+    d$value <- switch(anomaly,
+      max_percent = 100 * diff / max(cell_mean, na.rm = TRUE),
+      cell_percent = 100 * diff / cell_mean,
+      absolute = diff
+    )
   }
 
   if (!is.null(fill_limits)) {
@@ -262,17 +291,33 @@ plot_prediction_map <- function(
     remove = FALSE
   )
 
+  fill_scale <- if (type == "anomaly") {
+    lim <- fill_limits %||% c(-1, 1) * max(abs(d$value), na.rm = TRUE)
+    ggplot2::scale_fill_gradient2(
+      transform = if (identical(transform, "sqrt")) .signed_sqrt_trans() else transform,
+      limits = lim, midpoint = 0, n.breaks = 6,
+      low = "#2166AC", mid = "grey97", high = "#B2182B"
+    )
+  } else {
+    ggplot2::scale_fill_viridis_c(
+      transform = transform,
+      limits = fill_limits,
+      n.breaks = 4
+    )
+  }
+  fill_label <- if (type != "anomaly") column else switch(anomaly,
+    max_percent = "Anomaly\n(% of max)",
+    cell_percent = "Anomaly\n(% of cell mean)",
+    absolute = "Anomaly"
+  )
+
   p <- .basemap(d_sf, crs = crs, base_size = base_size) +
     ggplot2::geom_raster(
       data = d_sf,
       ggplot2::aes(x = .data$.X, y = .data$.Y, fill = .data$value)
     ) +
-    ggplot2::scale_fill_viridis_c(
-      transform = transform,
-      limits = fill_limits,
-      n.breaks = 4
-    ) +
-    ggplot2::labs(fill = column) +
+    fill_scale +
+    ggplot2::labs(fill = fill_label) +
     ggplot2::theme(
       legend.position = "bottom",
       axis.text = ggplot2::element_blank(),
@@ -280,10 +325,20 @@ plot_prediction_map <- function(
       axis.ticks = ggplot2::element_blank()
     )
 
-  if (type == "annual") {
+  if (type %in% c("annual", "anomaly")) {
     p <- p + ggplot2::facet_wrap(~time)
   }
   p
+}
+
+# Signed square-root transformation for diverging fill scales: keeps the sign
+# and spreads small absolute values.
+.signed_sqrt_trans <- function() {
+  scales::trans_new(
+    name = "signed_sqrt",
+    transform = function(x) sign(x) * sqrt(abs(x)),
+    inverse = function(x) sign(x) * x^2
+  )
 }
 
 #' Map spatial or spatiotemporal random fields
@@ -536,19 +591,24 @@ plot_fixed_effects <- function(fit, base_size = 11) {
 #' formal variance decomposition.
 #'
 #' @details
-#' Only components whose standard deviation is a marginal SD on the link scale
-#' are included:
+#' Included are the components with a variance on the link scale:
 #' * the spatial field (`sigma_O`) and spatiotemporal field (`sigma_E`);
 #' * random intercepts (`sd__(Intercept)`, one per grouping factor);
-#' * observation error, only for a `gaussian()` family with an identity link
-#'   or a `lognormal()` family, where `phi` is an SD on the link scale.
+#' * the observation-level variance on the link scale, where the family has one
+#'   that does not depend on the mean (Nakagawa et al. 2017,
+#'   \doi{10.1098/rsif.2017.0213}): `phi^2` for a `gaussian()` family with an
+#'   identity link and for `lognormal()`; `trigamma(phi)` for `Gamma()` with a
+#'   log link (`phi` is the shape); `pi^2 / 3` for a `binomial()` with a logit
+#'   link; and `pi^2 / 6` for a complementary log-log link, which includes the
+#'   first component of a Poisson-link delta model (`type = "poisson-link"`),
+#'   whose encounter probability is `1 - exp(-exp(eta))`.
 #'
-#' Left out are observation error for other families (for e.g. Tweedie, Gamma
-#' or NB2, `phi` is a dispersion or shape parameter, and binomial has none),
-#' smooth-term SDs (`sd__s(...)`, the SD of penalised spline coefficients,
-#' not of the fitted smooth) and spatially varying coefficient SDs
-#' (`sigma_Z`, whose contribution scales with the covariate). The proportions
-#' are therefore of the variance of the included components only.
+#' Left out are the observation-level variances that depend on the mean (e.g.
+#' Tweedie, Poisson, NB2), smooth-term SDs (`sd__s(...)`, the SD of penalised
+#' spline coefficients, not of the fitted smooth) and spatially varying
+#' coefficient SDs (`sigma_Z`, whose contribution scales with the covariate).
+#' The proportions are therefore of the variance of the included components
+#' only. For delta models, each component is partitioned on its own link scale.
 #'
 #' @param fit A fitted [sdmTMB::sdmTMB()] model.
 #' @param base_size Numeric. Base font size. Default `11`.
@@ -557,7 +617,7 @@ plot_fixed_effects <- function(fit, base_size = 11) {
 #'
 #' @section AI assistance:
 #' AI-assisted (model not recorded); not yet reviewed in full by the current
-#' model.
+#' model. Edited by Claude Opus 5.5 (Anthropic), 2026-11-24.
 #'
 #' @author Mikko Vihtakari
 #' @seealso [sdmTMB::tidy()]
@@ -577,25 +637,34 @@ plot_variance_partitioning <- function(fit, base_size = 11) {
   if (!inherits(fit, "sdmTMB")) stop("`fit` must be a fitted sdmTMB model.")
 
   n_models <- length(fit$family$family)
+  poisson_link <- identical(fit$family$type, "poisson_link_delta")
   tab <- dplyr::bind_rows(lapply(seq_len(n_models), function(m) {
     rp <- sdmTMB::tidy(fit, effects = "ran_pars", model = m)
     fam <- fit$family$family[m]
     link <- fit$family$link[m]
-    phi_on_link <- (fam == "gaussian" && link == "identity") ||
-      fam == "lognormal"
-    keep <- rp$term %in% c("sigma_O", "sigma_E", "sd__(Intercept)") |
-      (rp$term == "phi" & phi_on_link)
-    rp <- rp[keep & !is.na(rp$estimate), , drop = FALSE]
-    if (nrow(rp) == 0) return(NULL)
+    if (poisson_link && m == 1) link <- "cloglog"
+    rp <- rp[rp$term %in% c("sigma_O", "sigma_E", "sd__(Intercept)", "phi") &
+               !is.na(rp$estimate), , drop = FALSE]
     rp$variance <- rp$estimate^2
+    # Observation-level variance on the link scale (Nakagawa et al. 2017)
+    obs <- .observation_variance(fam, link, rp$estimate[rp$term == "phi"])
+    rp <- rp[rp$term != "phi", , drop = FALSE]
+    if (!is.null(obs)) {
+      rp <- dplyr::bind_rows(rp, tibble::tibble(
+        model = m, term = obs$term, estimate = sqrt(obs$variance),
+        variance = obs$variance
+      ))
+    }
+    if (nrow(rp) == 0) return(NULL)
     rp$family <- fam
     # only present when the model has random intercepts
     grp <- if ("group_name" %in% names(rp)) rp$group_name else NA_character_
     rp$component <- ifelse(
       rp$term == "sigma_O", "Spatial (sigma_O)",
       ifelse(rp$term == "sigma_E", "Spatiotemporal (sigma_E)",
-             ifelse(rp$term == "phi", "Observation error (phi)",
-                    paste0("Random intercept (", grp, ")"))))
+             ifelse(rp$term == "sd__(Intercept)",
+                    paste0("Random intercept (", grp, ")"),
+                    paste0("Observation (", rp$term, ")"))))
     rp$proportion <- rp$variance / sum(rp$variance)
     rp
   }))
@@ -609,13 +678,34 @@ plot_variance_partitioning <- function(fit, base_size = 11) {
   ) +
     ggplot2::geom_col(fill = "grey70", color = "black", linewidth = 0.3) +
     ggplot2::scale_y_continuous(labels = scales::percent_format()) +
+    ggplot2::scale_x_discrete(labels = scales::label_wrap(14)) +
     ggplot2::labs(x = "Model component",
-                  y = "Approx. proportion of link-scale variance") +
-    ggplot2::theme_bw(base_size = base_size) +
-    ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 20, hjust = 1))
+                  y = "Approx. proportion of\nlink-scale variance") +
+    ggplot2::theme_bw(base_size = base_size)
 
-  if (n_models > 1) p <- p + ggplot2::facet_wrap(~family)
+  if (n_models > 1) p <- p + ggplot2::facet_wrap(~family, scales = "free_x")
   p
+}
+
+# Observation-level variance on the link scale of one model component, or NULL
+# when it depends on the mean (Nakagawa et al. 2017). `phi` is the estimate of
+# the family's `phi` parameter (empty for families without one).
+.observation_variance <- function(family, link, phi = numeric()) {
+  phi <- phi[1]
+  if ((family == "gaussian" && link == "identity") || family == "lognormal") {
+    if (is.na(phi)) return(NULL)
+    return(list(term = "phi", variance = phi^2))
+  }
+  if (family == "Gamma" && link == "log") {
+    if (is.na(phi)) return(NULL)
+    return(list(term = "Gamma shape", variance = trigamma(phi)))
+  }
+  if (family == "binomial") {
+    v <- switch(link, logit = pi^2 / 3, cloglog = pi^2 / 6, probit = 1, NULL)
+    if (is.null(v)) return(NULL)
+    return(list(term = paste0("binomial, ", link), variance = v))
+  }
+  NULL
 }
 
 #' Histograms of observed and predicted response

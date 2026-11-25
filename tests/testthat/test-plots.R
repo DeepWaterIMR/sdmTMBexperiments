@@ -12,6 +12,9 @@ test_that("plotting helpers return ggplot objects", {
   pred <- predict(m, newdata = nd, type = "response")
 
   expect_s3_class(plot_prediction_map(pred, crs = 32609), "ggplot")
+  anom <- plot_prediction_map(pred, crs = 32609, type = "anomaly", transform = "sqrt")
+  expect_s3_class(anom, "ggplot")
+  expect_lt(abs(mean(anom$layers[[length(anom$layers)]]$data$value)), 1e-8)
   expect_s3_class(plot_random_field(pred, crs = 32609, field = "omega"), "ggplot")
   expect_s3_class(plot_random_field(pred, crs = 32609, field = "epsilon"), "ggplot")
   expect_s3_class(plot_fixed_effects(m), "ggplot")

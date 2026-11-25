@@ -12,7 +12,8 @@ make_prediction_grid(
   min_depth = NULL,
   max_depth = NULL,
   depth_fun = NULL,
-  bathy_style = "raster_continuous"
+  bathy_style = "raster_continuous",
+  drop_isolated = FALSE
 )
 }
 \arguments{
@@ -47,6 +48,12 @@ specific GEBCO file via \code{bathy.style = "raster_user"} and
 \code{\link[ggOceanMaps:get_depth]{ggOceanMaps::get_depth()}} when \code{depth_fun} is \code{NULL}. Default
 \code{"raster_continuous"} (ETOPO, bundled with ggOceanMaps — no extra
 download path needed). Ignored when \code{depth_fun} is supplied.}
+
+\item{drop_isolated}{Logical. Drop cells that have none of their eight
+neighbouring cells in the grid (after the depth filter)? Such single cells
+come from slivers of the region (a fjord mouth, a gap between islands, a
+fragment of the polygon) and show as stray pixels on maps. Default
+\code{FALSE}.}
 }
 \value{
 A data frame (class \code{sdmTMB_prediction_grid}, so
@@ -63,7 +70,7 @@ the model (divided by \code{coord_multiplier}).
 \section{AI assistance}{
 
 AI-assisted (model not recorded); not yet reviewed in full by the current
-model.
+model. Edited by Claude Opus 5.5 (Anthropic), 2026-11-24.
 }
 
 \examples{
