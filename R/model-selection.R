@@ -469,12 +469,16 @@ sdmTMB_selection <- function(
     # run under the same `cache_prefix`. One combined file would either refit
     # everything or, worse, satisfy a CV request from a fit-only cache entry.
     slug <- .selection_slug(nm)
-    fit_file <- if (is.null(cache_dir)) NULL else {
-      file.path(cache_dir, paste0(cache_prefix, "-", slug, ".rds"))
+    legacy <- .legacy_selection_slug(nm)
+    cache_path <- function(suffix) {
+      if (is.null(cache_dir)) return(NULL)
+      .adopt_legacy_cache(
+        file.path(cache_dir, paste0(cache_prefix, "-", slug, suffix, ".rds")),
+        file.path(cache_dir, paste0(cache_prefix, "-", legacy, suffix, ".rds"))
+      )
     }
-    cv_file <- if (is.null(cache_dir)) NULL else {
-      file.path(cache_dir, paste0(cache_prefix, "-", slug, "-cv.rds"))
-    }
+    fit_file <- cache_path("")
+    cv_file <- cache_path("-cv")
     read_cache <- function(f) {
       if (!refit && !is.null(f) && file.exists(f)) readRDS(f) else NULL
     }
@@ -943,13 +947,59 @@ plot.sdmTMB_selection <- function(
 #' appended to make the file unique; it is derived from the name alone, so
 #' reordering the candidate list still reuses the cache.
 #'
+#' The hash is the MD5 of the name's UTF-8 bytes, which is the same on every
+#' machine and R version. Up to 0.1.12 it was `rlang::hash()` of the name,
+#' which hashes the serialised R object and differs between R versions, so
+#' caches copied from a cluster with another R version were not found and were
+#' silently refitted. `.legacy_selection_slug()` gives the old name, so caches
+#' written by earlier versions are still found (see `.adopt_legacy_cache()`).
+#'
 #' @keywords internal
 #' @noRd
 .selection_slug <- function(x) {
   x <- as.character(x)
+  paste0(.slug_base(x), "-", substr(.md5_string(x), 1, 6))
+}
+
+#' @noRd
+.slug_base <- function(x) {
   slug <- gsub("(^-|-$)", "", gsub("[^a-z0-9]+", "-", tolower(x)))
   if (!nzchar(slug)) slug <- "candidate"
-  paste0(slug, "-", substr(rlang::hash(x), 1, 6))
+  slug
+}
+
+#' The cache name of sdmTMBexperiments <= 0.1.12 (R-version dependent)
+#' @noRd
+.legacy_selection_slug <- function(x) {
+  x <- as.character(x)
+  paste0(.slug_base(x), "-", substr(rlang::hash(x), 1, 6))
+}
+
+#' MD5 of the UTF-8 bytes of a string, independent of R version and platform
+#' @noRd
+.md5_string <- function(x) {
+  bytes <- charToRaw(enc2utf8(x))
+  if ("bytes" %in% names(formals(tools::md5sum))) {
+    return(unname(tools::md5sum(bytes = bytes)))
+  }
+  f <- tempfile()
+  on.exit(unlink(f))
+  writeBin(bytes, f)
+  unname(tools::md5sum(f))
+}
+
+#' Rename a cache file written under the legacy name to the current name
+#'
+#' Returns `file` unchanged. When `file` does not exist but the same cache under
+#' the legacy (rlang-hash) name does, that file is renamed to `file`, so a
+#' package update does not refit cached candidates.
+#' @noRd
+.adopt_legacy_cache <- function(file, legacy) {
+  if (!is.null(file) && !file.exists(file) && !identical(file, legacy) &&
+      file.exists(legacy)) {
+    file.rename(legacy, file)
+  }
+  file
 }
 
 #' Vectorised isTRUE(), NA-safe

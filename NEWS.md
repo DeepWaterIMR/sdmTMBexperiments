@@ -1,3 +1,11 @@
+# sdmTMBexperiments 0.1.13
+
+2026-11-25 Cache file names that do not depend on the R version.
+
+## Bug fixes
+
+* `sdmTMB_selection(cache_dir =)` names each candidate's cache with an MD5 of the candidate name's UTF-8 bytes instead of `rlang::hash()`, which hashes the serialised R object and gave different names under different R versions. Caches copied between machines (e.g. from a cluster with R 4.4 to a server with R 4.6) were then not found and every candidate was silently refitted. Caches written by earlier versions are found under their old names and renamed on first use, so updating the package does not refit them. Caches copied from a machine with another R version before this release still need renaming once.
+
 # sdmTMBexperiments 0.1.12
 
 2026-11-24 Anomaly maps; isolated grid cells; observation-level variance in the variance partitioning.

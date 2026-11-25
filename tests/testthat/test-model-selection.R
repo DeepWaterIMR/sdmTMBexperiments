@@ -100,6 +100,31 @@ test_that("candidate slugs are collision-safe", {
   )
 })
 
+test_that("candidate slugs do not depend on the R version", {
+  # MD5 of the UTF-8 bytes: fixed values, the same on every machine.
+  expect_equal(sdmTMBexperiments:::.selection_slug("15 km"), "15-km-f3e136")
+  expect_equal(substr(sdmTMBexperiments:::.md5_string("abc"), 1, 6), "900150")
+  expect_equal(
+    sdmTMBexperiments:::.selection_slug("Delta-lognormal, Poisson link"),
+    paste0("delta-lognormal-poisson-link-",
+           substr(sdmTMBexperiments:::.md5_string("Delta-lognormal, Poisson link"), 1, 6))
+  )
+})
+
+test_that("caches under the legacy name are adopted", {
+  dir <- withr::local_tempdir()
+  legacy <- file.path(dir, paste0("s-", sdmTMBexperiments:::.legacy_selection_slug("a b"), ".rds"))
+  current <- file.path(dir, paste0("s-", sdmTMBexperiments:::.selection_slug("a b"), ".rds"))
+  saveRDS(list(x = 1), legacy)
+  expect_identical(sdmTMBexperiments:::.adopt_legacy_cache(current, legacy), current)
+  expect_true(file.exists(current))
+  expect_false(file.exists(legacy))
+  # An existing current file is never overwritten.
+  saveRDS(list(x = 2), legacy)
+  sdmTMBexperiments:::.adopt_legacy_cache(current, legacy)
+  expect_equal(readRDS(current)$x, 1)
+})
+
 test_that("sdmTMB_selection compares candidates on identical records", {
   skip_on_cran()
   d <- sdmTMB::pcod
@@ -227,7 +252,7 @@ test_that("a CV run reuses the whole-frame fits an AIC ladder already cached", {
   )
 
   s1 <- do.call(sdmTMB_selection, args)
-  expect_setequal(basename(dir(dir)), paste0("stage-year-only-", substr(rlang::hash("Year only"), 1, 6), ".rds"))
+  expect_setequal(basename(dir(dir)), paste0("stage-", sdmTMBexperiments:::.selection_slug("Year only"), ".rds"))
 
   s2 <- do.call(sdmTMB_selection, c(args, list(cv = 2)))
   # A second file appeared for the folds, and the fit was not recomputed.
