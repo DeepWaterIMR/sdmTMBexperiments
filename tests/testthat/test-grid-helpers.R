@@ -88,3 +88,10 @@ test_that("make_prediction_grid applies a depth band", {
   expect_error(make_prediction_grid(region, resolution = 20, min_depth = 500,
                                     max_depth = 400, depth_fun = depth_fun))
 })
+
+test_that(".has_grid_neighbour flags single cells", {
+  x <- c(0, 10, 20, 50, 100, 110)
+  y <- c(0, 0, 10, 50, 100, 90)
+  expect_equal(sdmTMBexperiments:::.has_grid_neighbour(x, y, 10),
+               c(TRUE, TRUE, TRUE, FALSE, TRUE, TRUE))
+})

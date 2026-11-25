@@ -189,6 +189,18 @@ test_that("variance partitioning only uses link-scale SDs", {
   tab_g <- plot_variance_partitioning(mg)$data
   expect_true(all(c("phi", "sigma_O", "sd__(Intercept)") %in% tab_g$term))
   expect_true("Random intercept (g)" %in% tab_g$component)
+
+  # Poisson-link delta-gamma: cloglog encounter and Gamma-shape observation variances
+  mp <- sdmTMB::sdmTMB(
+    density ~ 1, data = d, mesh = sdmTMB::make_mesh(d, c("X", "Y"), cutoff = 30),
+    family = sdmTMB::delta_gamma(type = "poisson-link"), spatiotemporal = "off"
+  )
+  tab_p <- plot_variance_partitioning(mp)$data
+  expect_equal(tab_p$variance[tab_p$term == "binomial, cloglog"], pi^2 / 6)
+  phi2 <- sdmTMB::tidy(mp, "ran_pars", model = 2)
+  expect_equal(tab_p$variance[tab_p$term == "Gamma shape"],
+               trigamma(phi2$estimate[phi2$term == "phi"]))
+  expect_equal(sum(tab_p$proportion), 2)
 })
 
 test_that("prediction histogram handles a model with an offset", {

@@ -129,6 +129,11 @@ make_survey_prediction_region <- function(
 #'   [ggOceanMaps::get_depth()] when `depth_fun` is `NULL`. Default
 #'   `"raster_continuous"` (ETOPO, bundled with ggOceanMaps — no extra
 #'   download path needed). Ignored when `depth_fun` is supplied.
+#' @param drop_isolated Logical. Drop cells that have none of their eight
+#'   neighbouring cells in the grid (after the depth filter)? Such single cells
+#'   come from slivers of the region (a fjord mouth, a gap between islands, a
+#'   fragment of the polygon) and show as stray pixels on maps. Default
+#'   `FALSE`.
 #'
 #' @return A data frame (class `sdmTMB_prediction_grid`, so
 #'   [plot.sdmTMB_prediction_grid()] can be used on it directly) with columns
@@ -137,7 +142,7 @@ make_survey_prediction_region <- function(
 #'
 #' @section AI assistance:
 #' AI-assisted (model not recorded); not yet reviewed in full by the current
-#' model.
+#' model. Edited by Claude Opus 5.5 (Anthropic), 2026-11-24.
 #'
 #' @author Mikko Vihtakari
 #' @seealso [make_survey_prediction_region()], [plot.sdmTMB_prediction_grid()]
@@ -174,7 +179,8 @@ make_prediction_grid <- function(
   min_depth = NULL,
   max_depth = NULL,
   depth_fun = NULL,
-  bathy_style = "raster_continuous"
+  bathy_style = "raster_continuous",
+  drop_isolated = FALSE
 ) {
   if (!inherits(region, c("sf", "sfc"))) {
     stop("`region` must be an sf or sfc object.")
@@ -213,6 +219,10 @@ make_prediction_grid <- function(
     out$depth <- depth
     out <- out[!is.na(out$depth) & out$depth >= min_depth &
                  out$depth <= max_depth, , drop = FALSE]
+  }
+
+  if (drop_isolated && nrow(out) > 0) {
+    out <- out[.has_grid_neighbour(out$X, out$Y, resolution), , drop = FALSE]
   }
 
   class(out) <- c("sdmTMB_prediction_grid", class(out))
@@ -330,4 +340,15 @@ plot.sdmTMB_prediction_grid <- function(
   }
 
   p + ggplot2::theme(legend.position = "bottom")
+}
+
+# Does each cell of a regular grid have at least one of its eight neighbours?
+# `x`, `y` are cell centres and `resolution` the cell side, in the same units.
+.has_grid_neighbour <- function(x, y, resolution) {
+  i <- round((x - min(x)) / resolution)
+  j <- round((y - min(y)) / resolution)
+  key <- paste(i, j)
+  di <- c(-1, -1, -1, 0, 0, 1, 1, 1)
+  dj <- c(-1, 0, 1, -1, 1, -1, 0, 1)
+  vapply(seq_along(i), function(k) any(paste(i[k] + di, j[k] + dj) %in% key), logical(1))
 }

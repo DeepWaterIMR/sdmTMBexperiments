@@ -21,26 +21,31 @@ variance from each. This is an approximate, descriptive summary, not a
 formal variance decomposition.
 }
 \details{
-Only components whose standard deviation is a marginal SD on the link scale
-are included:
+Included are the components with a variance on the link scale:
 \itemize{
 \item the spatial field (\code{sigma_O}) and spatiotemporal field (\code{sigma_E});
 \item random intercepts (\code{sd__(Intercept)}, one per grouping factor);
-\item observation error, only for a \code{gaussian()} family with an identity link
-or a \code{lognormal()} family, where \code{phi} is an SD on the link scale.
+\item the observation-level variance on the link scale, where the family has one
+that does not depend on the mean (Nakagawa et al. 2017,
+\doi{10.1098/rsif.2017.0213}): \code{phi^2} for a \code{gaussian()} family with an
+identity link and for \code{lognormal()}; \code{trigamma(phi)} for \code{Gamma()} with a
+log link (\code{phi} is the shape); \code{pi^2 / 3} for a \code{binomial()} with a logit
+link; and \code{pi^2 / 6} for a complementary log-log link, which includes the
+first component of a Poisson-link delta model (\code{type = "poisson-link"}),
+whose encounter probability is \code{1 - exp(-exp(eta))}.
 }
 
-Left out are observation error for other families (for e.g. Tweedie, Gamma
-or NB2, \code{phi} is a dispersion or shape parameter, and binomial has none),
-smooth-term SDs (\code{sd__s(...)}, the SD of penalised spline coefficients,
-not of the fitted smooth) and spatially varying coefficient SDs
-(\code{sigma_Z}, whose contribution scales with the covariate). The proportions
-are therefore of the variance of the included components only.
+Left out are the observation-level variances that depend on the mean (e.g.
+Tweedie, Poisson, NB2), smooth-term SDs (\code{sd__s(...)}, the SD of penalised
+spline coefficients, not of the fitted smooth) and spatially varying
+coefficient SDs (\code{sigma_Z}, whose contribution scales with the covariate).
+The proportions are therefore of the variance of the included components
+only. For delta models, each component is partitioned on its own link scale.
 }
 \section{AI assistance}{
 
 AI-assisted (model not recorded); not yet reviewed in full by the current
-model.
+model. Edited by Claude Opus 5.5 (Anthropic), 2026-11-24.
 }
 
 \examples{

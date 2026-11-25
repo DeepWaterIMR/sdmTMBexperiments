@@ -8,10 +8,11 @@ plot_prediction_map(
   pred,
   crs,
   column = "est",
-  type = c("mean", "annual"),
+  type = c("mean", "annual", "anomaly"),
   time_col = "year",
   transform = "identity",
   fill_limits = NULL,
+  anomaly = c("max_percent", "cell_percent", "absolute"),
   xy_cols = c("X", "Y"),
   coord_multiplier = 1000,
   base_size = 11
@@ -29,20 +30,24 @@ suitable \code{fill_limits} if you want to floor the colour scale, or use
 
 \item{column}{Character. Name of the response column. Default \code{"est"}.}
 
-\item{type}{Character. \code{"mean"} (default) or \code{"annual"}.}
+\item{type}{Character. \code{"mean"} (default), \code{"annual"} or \code{"anomaly"}.}
 
-\item{time_col}{Character. Name of the time column (for \code{type = "annual"}).
-Default \code{"year"}.}
+\item{time_col}{Character. Name of the time column (for \code{type = "annual"}
+and \code{"anomaly"}). Default \code{"year"}.}
 
 \item{transform}{Character. Fill-scale transformation, passed to
 \code{transform} in \code{\link[ggplot2:continuous_scale]{ggplot2::continuous_scale()}} (the successor to the
-now-deprecated \code{trans} argument). Default \code{"identity"}.}
+now-deprecated \code{trans} argument). Default \code{"identity"}. For
+\code{type = "anomaly"}, \code{"sqrt"} is a signed square root.}
 
 \item{fill_limits}{Numeric vector of length two (either element may be
 \code{NA}), passed to \code{limits} in \code{\link[ggplot2:continuous_scale]{ggplot2::continuous_scale()}}. Values outside
 the limits are mapped to \code{NA} by ggplot2 and rendered as blank/grey cells.
 Default \code{NULL}: the scale's range is taken from the data, so no cells are
 dropped. Set e.g. \code{c(0, NA)} to floor a response-scale plot at zero.}
+
+\item{anomaly}{Character. Scale of the anomaly for \code{type = "anomaly"}:
+\code{"max_percent"} (default), \code{"cell_percent"} or \code{"absolute"}. See Details.}
 
 \item{xy_cols}{Character vector of the coordinate columns. Default
 \code{c("X", "Y")}.}
@@ -57,13 +62,27 @@ A \code{ggplot} object.
 }
 \description{
 Maps predicted response values from \code{\link[stats:predict]{stats::predict()}} output on a
-\code{\link[ggOceanMaps:basemap]{ggOceanMaps::basemap()}}, either averaged over time (\code{type = "mean"}) or
-faceted by time (\code{type = "annual"}).
+\code{\link[ggOceanMaps:basemap]{ggOceanMaps::basemap()}}, either averaged over time (\code{type = "mean"}),
+faceted by time (\code{type = "annual"}), or as the annual difference from each
+cell's mean over time (\code{type = "anomaly"}), faceted by time.
+}
+\details{
+For \code{type = "anomaly"}, each cell's value in a year is compared with the mean
+of that cell over all years, \eqn{x_{c,t} - \bar{x}_c}, and expressed as set
+by \code{anomaly}: \code{"max_percent"} (default) divides it by the largest cell mean
+and multiplies by 100, so that all panels share one scale relative to the
+densest cell and sparse cells do not produce large percentages;
+\code{"cell_percent"} divides it by the cell's own mean (percent change of the
+cell); \code{"absolute"} keeps the response units. The anomaly map uses a
+diverging scale centred on zero; \code{transform = "sqrt"} applies a signed
+square root, which keeps the sign and makes small differences visible.
+Use \code{column} on the response scale (e.g. \code{predict(..., type = "response")}
+or \code{exp()} of a log prediction) for an anomaly of density.
 }
 \section{AI assistance}{
 
 AI-assisted (model not recorded); not yet reviewed in full by the current
-model.
+model. Edited by Claude Opus 5.5 (Anthropic), 2026-11-24.
 }
 
 \examples{

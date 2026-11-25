@@ -1,3 +1,17 @@
+# sdmTMBexperiments 0.1.12
+
+2026-11-24 Anomaly maps; isolated grid cells; observation-level variance in the variance partitioning.
+
+## New features
+
+* `plot_prediction_map(type = "anomaly")` maps the annual difference of each cell from its mean over the years, as a percentage of the largest cell mean (`anomaly = "max_percent"`, default), of the cell's own mean (`"cell_percent"`) or in response units (`"absolute"`), on a diverging scale; `transform = "sqrt"` is a signed square root there.
+
+* `make_prediction_grid(drop_isolated = TRUE)` drops cells without any of their eight neighbours, the stray single cells that slivers of a region leave on the maps.
+
+## Bug fixes
+
+* `plot_variance_partitioning()` now includes the observation-level variance on the link scale for the families where it does not depend on the mean (Nakagawa et al. 2017): `trigamma(phi)` for Gamma (log link), `pi^2 / 3` for a logit binomial and `pi^2 / 6` for a complementary log-log binomial, including the encounter component of Poisson-link delta models. Before, these components showed the random fields only (for example 100 % spatial for the positive component of a delta-gamma model), which could not be compared with a lognormal model, whose `phi` was included.
+
 # sdmTMBexperiments 0.1.11
 
 2026-11-18 Disclosure of generative-AI use.
