@@ -1,3 +1,11 @@
+# sdmTMBexperiments 0.1.14
+
+2026-11-26 Absolute leave-out influence for survey series.
+
+## New features
+
+* `sdmTMB_leave_out(measure = "absolute")` measures influence as the geometric mean absolute change of the index over all index years, `exp(mean(abs(log(ratio)))) - 1`, with leverage per share of all rows (new column `haul_share_all`). The default signed measure (one minus the geometric mean ratio over the identifier's own years) cancels changes in opposite directions and lets a series with few years outrank one that moves every year; in a ling survey index it gave the coastal survey 0.03 although leaving it out moved the index by about 36 % a year. Use `"absolute"` for survey series; the signed measure still suits single-year units such as cruises. `plot(type = "leverage")` follows the measure.
+
 # sdmTMBexperiments 0.1.13
 
 2026-11-25 Cache file names that do not depend on the R version.

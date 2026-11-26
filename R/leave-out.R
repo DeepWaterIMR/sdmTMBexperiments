@@ -49,6 +49,13 @@
 #' @param future_seed Logical or integer. Future-compatible random seed.
 #' @param verbose Logical. Show progress messages (via \pkg{cli} when
 #'   installed)? Default `TRUE`.
+#' @param measure Character. How `influence` is measured (see *Influence and
+#'   leverage*). `"signed"` (default) is one minus the geometric mean ratio over
+#'   the years the identifier has data, with `leverage = influence /
+#'   haul_share`; suits single-year units such as cruises and hauls.
+#'   `"absolute"` is the geometric mean absolute change over all index years,
+#'   with `leverage = influence / haul_share_all`; use it for survey series and
+#'   other units that span several years.
 #'
 #' @return An object of class `sdmTMB_leave_out`, a list with
 #'   * `full`: the index of the refit to all data, by year;
@@ -58,9 +65,8 @@
 #'     no data left after removing `id`, where `est` is `NA`);
 #'   * `influence`: one row per identifier with the number of rows removed,
 #'     the years it has data in (`id_years`), `haul_share` (its share of the
-#'     rows in those years), `influence` (one minus the geometric mean ratio
-#'     over those years, so positive when the identifier raises the index),
-#'     `leverage` (`influence / haul_share`), `max_abs_change` and
+#'     rows in those years), `haul_share_all` (its share of all rows),
+#'     `influence` (by `measure`), `leverage`, `max_abs_change` and
 #'     `year_max_change` (the largest absolute relative change over all years)
 #'     and `all_ok` (whether the refit passed [sdmTMB::sanity()]).
 #'
@@ -73,6 +79,17 @@
 #' that sampled a high-density area few other cruises cover. A practical screen
 #' is `influence >= 0.1 & leverage >= 2`; see `plot(x, type = "leverage")`.
 #' Screen candidates cheaply first with [density_share()].
+#'
+#' The signed measure (`measure = "signed"`) averages log ratios, so a unit
+#' that raises some years and lowers others gets an influence near zero, and
+#' averaging over the unit's own years lets a series with two years outrank
+#' one that moves every year. For units that span several years, such as
+#' survey series, use `measure = "absolute"`:
+#' \eqn{\exp(\overline{|\log r_t|}) - 1} over all index years, where
+#' \eqn{r_t} is the leave-out index divided by the full index in year
+#' \eqn{t}, and leverage per share of all rows. In a ling survey index the
+#' signed measure gave the coastal survey 0.03 although leaving it out moved
+#' the index by about 36 % a year.
 #'
 #' @section AI assistance:
 #' AI-assisted (model not recorded); not yet reviewed in full by the current
@@ -119,10 +136,12 @@ sdmTMB_leave_out <- function(
   warm_start = TRUE,
   n_workers = 1,
   future_seed = TRUE,
-  verbose = TRUE
+  verbose = TRUE,
+  measure = c("signed", "absolute")
 ) {
   if (!inherits(object, "sdmTMB")) stop("`object` must be a fitted sdmTMB model.")
   index <- match.arg(index)
+  measure <- match.arg(measure)
   time_col <- object$time
   dat <- object$data
   if (!id_col %in% names(dat)) {
@@ -220,6 +239,7 @@ sdmTMB_leave_out <- function(
     function(y) sum(rows_by_year[as.character(y)]),
     numeric(1)
   )
+  id_info$haul_share_all <- id_info$n_removed / nrow(dat)
 
   influence <- id_info |>
     dplyr::left_join(
@@ -229,13 +249,33 @@ sdmTMB_leave_out <- function(
       ),
       by = "id"
     )
+  influence <- .leave_out_influence(influence, index_out, measure)
+
+  structure(
+    list(full = full, index = index_out, influence = influence),
+    class = "sdmTMB_leave_out",
+    id_col = id_col,
+    index_type = index,
+    measure = measure
+  )
+}
+
+# Influence, leverage and the largest change of each identifier (sdmTMB_leave_out()).
+# `info` has id, id_years, haul_share and haul_share_all; `index_out` has id, year and ratio.
+.leave_out_influence <- function(info, index_out, measure = "signed") {
   if (nrow(index_out) > 0) {
     stats_by_id <- index_out |>
-      dplyr::left_join(dplyr::select(id_info, "id", "id_years"), by = "id") |>
+      dplyr::left_join(dplyr::select(info, "id", "id_years"), by = "id") |>
       dplyr::summarise(
         influence = {
-          r <- .data$ratio[.data$year %in% .data$id_years[[1]] & !is.na(.data$ratio)]
-          if (length(r) == 0) NA_real_ else 1 - exp(mean(log(r)))
+          ok <- !is.na(.data$ratio) & .data$ratio > 0
+          if (measure == "absolute") {
+            r <- .data$ratio[ok]
+            if (length(r) == 0) NA_real_ else exp(mean(abs(log(r)))) - 1
+          } else {
+            r <- .data$ratio[ok & .data$year %in% .data$id_years[[1]]]
+            if (length(r) == 0) NA_real_ else 1 - exp(mean(log(r)))
+          }
         },
         max_abs_change = if (all(is.na(.data$ratio))) NA_real_ else
           max(abs(.data$ratio - 1), na.rm = TRUE),
@@ -243,24 +283,17 @@ sdmTMB_leave_out <- function(
           .data$year[which.max(abs(.data$ratio - 1))],
         .by = "id"
       )
-    influence <- dplyr::left_join(influence, stats_by_id, by = "id")
+    info <- dplyr::left_join(info, stats_by_id, by = "id")
   } else {
-    influence$influence <- NA_real_
-    influence$max_abs_change <- NA_real_
-    influence$year_max_change <- NA
+    info$influence <- NA_real_
+    info$max_abs_change <- NA_real_
+    info$year_max_change <- NA
   }
-  influence$leverage <- influence$influence / influence$haul_share
-  influence <- influence |>
-    dplyr::relocate("leverage", .after = "influence") |>
-    dplyr::relocate("all_ok", .after = dplyr::last_col()) |>
-    dplyr::arrange(dplyr::desc(.data$influence))
-
-  structure(
-    list(full = full, index = index_out, influence = influence),
-    class = "sdmTMB_leave_out",
-    id_col = id_col,
-    index_type = index
-  )
+  share <- if (measure == "absolute") info$haul_share_all else info$haul_share
+  info$leverage <- info$influence / share
+  info <- dplyr::relocate(info, "leverage", .after = "influence")
+  if ("all_ok" %in% names(info)) info <- dplyr::relocate(info, "all_ok", .after = dplyr::last_col())
+  dplyr::arrange(info, dplyr::desc(.data$influence))
 }
 
 #' Plot leave-one-out influence
@@ -334,9 +367,11 @@ plot.sdmTMB_leave_out <- function(
     if (nrow(inf) == 0) stop("No influence values to plot.")
     inf$flagged <- inf$influence >= influence_limit &
       inf$leverage >= leverage_limit
-    share_max <- max(inf$haul_share, na.rm = TRUE)
+    absolute <- identical(attr(x, "measure"), "absolute")
+    inf$share <- if (absolute) inf$haul_share_all else inf$haul_share
+    share_max <- max(inf$share, na.rm = TRUE)
     return(
-      ggplot2::ggplot(inf, ggplot2::aes(x = .data$haul_share, y = .data$influence)) +
+      ggplot2::ggplot(inf, ggplot2::aes(x = .data$share, y = .data$influence)) +
         ggplot2::geom_hline(yintercept = c(0, influence_limit),
                             linetype = c(1, 2), color = "grey60") +
         ggplot2::geom_abline(slope = c(1, leverage_limit), intercept = 0,
@@ -352,8 +387,10 @@ plot.sdmTMB_leave_out <- function(
         ) +
         ggplot2::coord_cartesian(xlim = c(0, share_max * 1.15)) +
         ggplot2::labs(
-          x = paste("Share of the year's hauls,", attr(x, "id_col")),
-          y = "Influence (1 - leave-out / full)"
+          x = if (absolute) paste("Share of all hauls,", attr(x, "id_col")) else
+            paste("Share of the year's hauls,", attr(x, "id_col")),
+          y = if (absolute) "Influence (mean absolute change)" else
+            "Influence (1 - leave-out / full)"
         ) +
         ggplot2::theme_classic(base_size = base_size)
     )

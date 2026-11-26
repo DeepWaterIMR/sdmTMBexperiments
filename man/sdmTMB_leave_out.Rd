@@ -17,7 +17,8 @@ sdmTMB_leave_out(
   warm_start = TRUE,
   n_workers = 1,
   future_seed = TRUE,
-  verbose = TRUE
+  verbose = TRUE,
+  measure = c("signed", "absolute")
 )
 }
 \arguments{
@@ -57,6 +58,13 @@ otherwise \code{future::multisession}).}
 
 \item{verbose}{Logical. Show progress messages (via \pkg{cli} when
 installed)? Default \code{TRUE}.}
+
+\item{measure}{Character. How \code{influence} is measured (see \emph{Influence and
+leverage}). \code{"signed"} (default) is one minus the geometric mean ratio over
+the years the identifier has data, with \code{leverage = influence / haul_share}; suits single-year units such as cruises and hauls.
+\code{"absolute"} is the geometric mean absolute change over all index years,
+with \code{leverage = influence / haul_share_all}; use it for survey series and
+other units that span several years.}
 }
 \value{
 An object of class \code{sdmTMB_leave_out}, a list with
@@ -68,9 +76,8 @@ An object of class \code{sdmTMB_leave_out}, a list with
 no data left after removing \code{id}, where \code{est} is \code{NA});
 \item \code{influence}: one row per identifier with the number of rows removed,
 the years it has data in (\code{id_years}), \code{haul_share} (its share of the
-rows in those years), \code{influence} (one minus the geometric mean ratio
-over those years, so positive when the identifier raises the index),
-\code{leverage} (\code{influence / haul_share}), \code{max_abs_change} and
+rows in those years), \code{haul_share_all} (its share of all rows),
+\code{influence} (by \code{measure}), \code{leverage}, \code{max_abs_change} and
 \code{year_max_change} (the largest absolute relative change over all years)
 and \code{all_ok} (whether the refit passed \code{\link[sdmTMB:sanity]{sdmTMB::sanity()}}).
 }
@@ -108,6 +115,17 @@ more than its sample size warrants, typically a one-off or auxiliary cruise
 that sampled a high-density area few other cruises cover. A practical screen
 is \code{influence >= 0.1 & leverage >= 2}; see \code{plot(x, type = "leverage")}.
 Screen candidates cheaply first with \code{\link[=density_share]{density_share()}}.
+
+The signed measure (\code{measure = "signed"}) averages log ratios, so a unit
+that raises some years and lowers others gets an influence near zero, and
+averaging over the unit's own years lets a series with two years outrank
+one that moves every year. For units that span several years, such as
+survey series, use \code{measure = "absolute"}:
+\eqn{\exp(\overline{|\log r_t|}) - 1} over all index years, where
+\eqn{r_t} is the leave-out index divided by the full index in year
+\eqn{t}, and leverage per share of all rows. In a ling survey index the
+signed measure gave the coastal survey 0.03 although leaving it out moved
+the index by about 36 \% a year.
 }
 
 \section{AI assistance}{
