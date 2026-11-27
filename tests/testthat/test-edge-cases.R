@@ -166,6 +166,10 @@ test_that("compare_surveys: numeric area vector and non-`year` time", {
   expect_false("survey_year" %in% names(s1$index))
   expect_s3_class(ggplot2::ggplot_build(plot(s1)), "ggplot_built")
   expect_s3_class(suppressWarnings(ggplot2::ggplot_build(plot(s1, type = "scatter"))),
+                  "ggplot_built")  # Every survey model failed: no survey index, the scatter plot still draws.
+  s_none <- s1
+  s_none$index <- s_none$index[s_none$index$model == attr(s1, "reference_label"), ]
+  expect_s3_class(suppressWarnings(ggplot2::ggplot_build(plot(s_none, type = "scatter"))),
                   "ggplot_built")
 })
 

@@ -1,3 +1,11 @@
+# sdmTMBexperiments 0.1.16
+
+2026-11-27 Survey scatter plot without survey indices.
+
+## Bug fixes
+
+* `plot.sdmTMB_survey_comparison(type = "scatter")` no longer errors when no survey has an index (e.g. every survey model failed): the fit annotations are skipped instead of indexing an empty table.
+
 # sdmTMBexperiments 0.1.15
 
 2026-11-27 Slanted factor labels in the conditional-effects plot.

@@ -998,6 +998,10 @@ plot.sdmTMB_survey_comparison <- function(
         )
       }) |>
         dplyr::bind_rows()
+    }
+    # No survey with two or more index years (e.g. every survey model failed):
+    # nothing to annotate.
+    if (isTRUE(annotate_fit) && nrow(fit_labs) > 0) {
       fit_labs$model <- factor(fit_labs$model, levels = surveys)
       fit_labs <- fit_labs[order(fit_labs$model), ]
       fit_labs$vjust <- seq_len(nrow(fit_labs)) * 2.2 - 1
