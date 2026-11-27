@@ -400,7 +400,8 @@ print.sdmTMB_conditional_effects <- function(x, ...) {
 #' @param base_size Numeric. Base font size. Default `9`.
 #' @param widths Optional named numeric vector of relative panel widths by
 #'   term (variable name). By default continuous panels are 1.3 wide and factor
-#'   panels grow with the number of levels.
+#'   panels grow with the number of levels. Factor labels longer than four
+#'   characters are slanted when together they would crowd the axis.
 #' @param ... Not used.
 #'
 #' @return A `cowplot` grid (a `ggplot` object).
@@ -503,6 +504,12 @@ plot.sdmTMB_conditional_effects <- function(x, fit = NULL, data = NULL,
           breaks = d$xnum[idx], labels = d$x[idx],
           expand = ggplot2::expansion(add = 0.5)
         )
+        # Long level names (e.g. trawl models) are slanted so that they do not
+        # overlap; short ones (years, months, "Cod") stay horizontal.
+        lab_n <- nchar(d$x[idx])
+        if (max(lab_n) > 4 && sum(lab_n) > 12) {
+          p <- p + ggplot2::guides(x = ggplot2::guide_axis(angle = 45))
+        }
       }
       p + ggplot2::labs(x = d$label[1], y = if (v == first) y_lab else NULL) +
         ggplot2::theme_bw(base_size = base_size)

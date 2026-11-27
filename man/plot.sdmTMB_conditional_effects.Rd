@@ -35,7 +35,8 @@ given.}
 
 \item{widths}{Optional named numeric vector of relative panel widths by
 term (variable name). By default continuous panels are 1.3 wide and factor
-panels grow with the number of levels.}
+panels grow with the number of levels. Factor labels longer than four
+characters are slanted when together they would crowd the axis.}
 
 \item{...}{Not used.}
 }

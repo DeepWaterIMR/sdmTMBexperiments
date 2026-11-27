@@ -1,3 +1,11 @@
+# sdmTMBexperiments 0.1.15
+
+2026-11-27 Slanted factor labels in the conditional-effects plot.
+
+## Minor improvements
+
+* `plot.sdmTMB_conditional_effects()` slants the labels of a factor panel by 45° when they are long (more than four characters, more than 12 in all), so that trawl-model names such as "Campelen Rs" and "Konsum 60" do not overlap. Years, months and short gear types stay horizontal.
+
 # sdmTMBexperiments 0.1.14
 
 2026-11-26 Absolute leave-out influence for survey series.
